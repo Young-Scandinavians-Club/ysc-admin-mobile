@@ -42,7 +42,7 @@ export const api = {
   signOut: () => _signOut(getApiConfig()),
 };
 
-export { signInWithPassword } from './endpoints';
+export { exchangeCode, signInWithPassword } from './endpoints';
 
 export type {
   ApiErrorBody,

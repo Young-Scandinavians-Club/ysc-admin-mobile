@@ -24,6 +24,17 @@ export function signInWithPassword(
   });
 }
 
+export function exchangeCode(
+  config: ApiClientConfig,
+  code: string
+): Promise<PasswordSessionResponse> {
+  return request<PasswordSessionResponse>(config, '/api/v1/app/auth/exchange', {
+    method: 'POST',
+    body: { code },
+    skipAuth: true,
+  });
+}
+
 export function signOut(config: ApiClientConfig): Promise<undefined> {
   return request<undefined>(config, '/api/v1/app/auth/logout', { method: 'DELETE' });
 }
