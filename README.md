@@ -68,6 +68,46 @@ make typecheck    # tsc --noEmit
 make test        # jest
 ```
 
+## Design system
+
+UI styling follows `ysc.org`'s `STYLE_GUIDE.md` and `assets/tailwind.config.js`
+as closely as NativeWind allows, so the app reads as the same product as the
+web admin dashboard rather than a re-skin:
+
+- **Colors**: the exact same `blue` palette override from the web app's
+  Tailwind config (`tailwind.config.js` here), not Tailwind's stock blue —
+  `blue-700`/`blue-800` for primary actions, `blue-900` (`#144993`) as the
+  brand mark. Neutrals are **zinc only** (`gray-*`/`slate-*` are banned in the
+  style guide — don't reintroduce them here either).
+- **Buttons**: `rounded` (not `rounded-md`/`rounded-lg`), `bg-blue-700`,
+  `disabled:opacity-80`, and `active:scale-[0.98]` — matches the web
+  `<.button>` component's press state exactly, one-to-one, as plain NativeWind
+  utility classes (`transition-transform duration-150 ease-in-out
+  active:scale-[0.98]`). Entrance fades (e.g. on `SignInScreen`) are likewise
+  a plain `transition-all`/`opacity`/`translate-y` class toggle, not an
+  imperative animation call.
+- **Cards**: `bg-white rounded-xl border border-zinc-100`, matching the web's
+  "standard content card".
+- **Form errors**: `text-rose-600` (the style guide reserves `rose-*`
+  specifically for form validation text, `red-*` for general/destructive
+  errors).
+- Animations stay in CSS/NativeWind, not Reanimated's imperative API
+  (`useSharedValue`/`useAnimatedStyle`): the two don't compose cleanly on a
+  single element (NativeWind's `className`-driven style and Reanimated's
+  worklet-driven `style` fight over the same node), and NativeWind's own
+  `transition-*`/pseudo-class (`active:`, `disabled:`) utilities cover
+  everything this app needs. Note `react-native-reanimated`/
+  `react-native-worklets` are still real, version-pinned dependencies even so
+  — NativeWind's underlying `react-native-css-interop` has a hard peer
+  dependency on Reanimated, so they can't be removed even though nothing in
+  this app calls Reanimated's API directly.
+- Minimum touch target `min-h-[44px]` on every interactive element, per the
+  style guide's accessibility checklist (this matters more here than on web,
+  since everything is touch).
+
+When building the Phase D checkout/membership screens, pull from the same
+palette/spacing conventions rather than inventing new ones.
+
 ## Architecture
 
 - `api/` — typed API client (`config.ts`, `client.ts`, `endpoints.ts`,

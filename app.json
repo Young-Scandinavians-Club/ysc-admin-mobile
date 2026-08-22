@@ -23,6 +23,14 @@
           "bluetoothAlwaysUsagePermission": "YSC Admin uses Bluetooth to connect to supported card readers.",
           "localNetworkUsagePermission": "YSC Admin uses the local network to connect to supported card readers."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
       ]
     ],
     "orientation": "default",

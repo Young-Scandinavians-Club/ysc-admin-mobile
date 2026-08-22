@@ -16,7 +16,7 @@ function AppContent() {
   if (status === 'loading') {
     return (
       <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color="#1b1b52" />
+        <ActivityIndicator size="large" color="#144993" />
       </View>
     );
   }
