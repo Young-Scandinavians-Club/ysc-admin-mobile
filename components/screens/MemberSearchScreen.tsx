@@ -52,15 +52,11 @@ export function MemberSearchScreen({ navigation, route }: Props) {
         navigation.navigate('MembershipPlans', { memberId: member.id, memberName: name });
       }
     } else {
-      navigation.navigate('CollectPayment', {
-        kind: 'ticket',
-        memberId: member.id,
-        memberName: name,
+      navigation.navigate('EventTicketQuantities', {
         eventId: params.eventId,
         eventTitle: params.eventTitle,
-        ticketTierId: params.ticketTierId,
-        ticketTierName: params.ticketTierName,
-        priceLabel: params.priceLabel,
+        memberId: member.id,
+        memberName: name,
       });
     }
   }
@@ -69,7 +65,7 @@ export function MemberSearchScreen({ navigation, route }: Props) {
     <View className="flex-1 bg-zinc-50">
       <ScreenHeader
         title="Find member"
-        subtitle={params.purpose === 'ticket' ? params.ticketTierName : 'Membership'}
+        subtitle={params.purpose === 'ticket' ? params.eventTitle : 'Membership'}
         onBack={() => navigation.goBack()}
       />
 

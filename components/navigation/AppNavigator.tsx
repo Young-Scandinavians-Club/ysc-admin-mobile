@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { RootStackParamList } from './types';
 
 import { CollectPaymentScreen } from '@/components/screens/CollectPaymentScreen';
-import { EventTicketTiersScreen } from '@/components/screens/EventTicketTiersScreen';
+import { EventTicketQuantitiesScreen } from '@/components/screens/EventTicketQuantitiesScreen';
 import { HomeScreen } from '@/components/screens/HomeScreen';
 import { MemberSearchScreen } from '@/components/screens/MemberSearchScreen';
 import { MembershipDetailsScreen } from '@/components/screens/MembershipDetailsScreen';
@@ -37,7 +37,7 @@ export function AppNavigator() {
             <Stack.Screen name="MemberSearch" component={MemberSearchScreen} />
             <Stack.Screen name="MembershipDetails" component={MembershipDetailsScreen} />
             <Stack.Screen name="MembershipPlans" component={MembershipPlansScreen} />
-            <Stack.Screen name="EventTicketTiers" component={EventTicketTiersScreen} />
+            <Stack.Screen name="EventTicketQuantities" component={EventTicketQuantitiesScreen} />
             <Stack.Screen name="CollectPayment" component={CollectPaymentScreen} />
           </>
         ) : (

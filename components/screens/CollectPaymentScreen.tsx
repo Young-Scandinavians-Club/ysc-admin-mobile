@@ -29,8 +29,8 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
   const [localPhase, setLocalPhase] = useState<LocalPhase>('preparing');
   const [error, setError] = useState<string | null>(null);
 
-  const title = params.kind === 'ticket' ? params.ticketTierName : params.planName;
-  const amountLabel = params.kind === 'ticket' ? params.priceLabel : params.amountLabel;
+  const title = params.kind === 'ticket' ? params.eventTitle : params.planName;
+  const amountLabel = params.kind === 'ticket' ? params.totalLabel : params.amountLabel;
 
   // While the terminal SDK is actively connecting/collecting/processing, its own
   // step takes precedence; otherwise we're between API calls (preparing the
@@ -46,8 +46,14 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
   const run = useCallback(async () => {
     try {
       if (params.kind === 'ticket') {
-        const intent = await api.createTicketPaymentIntent(params.ticketTierId, {
+        const tiers: Record<string, number> = {};
+        for (const item of params.items) {
+          tiers[item.ticketTierId] = item.quantity;
+        }
+
+        const intent = await api.createTicketPaymentIntent(params.eventId, {
           member_id: params.memberId,
+          tiers,
         });
 
         const outcome = await collector.collectPayment(intent.client_secret);
@@ -102,6 +108,15 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
         <View className="mb-6 items-center">
           <Text className="text-base font-semibold text-zinc-900">{title}</Text>
           <Text className="mt-1 text-2xl font-bold text-blue-900">{amountLabel}</Text>
+          {params.kind === 'ticket' && (
+            <View className="mt-3 items-center">
+              {params.items.map((item) => (
+                <Text key={item.ticketTierId} className="text-sm text-zinc-500">
+                  {item.quantity}× {item.name}
+                </Text>
+              ))}
+            </View>
+          )}
         </View>
 
         {phase === 'success' ? (

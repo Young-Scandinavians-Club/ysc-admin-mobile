@@ -1,13 +1,12 @@
 export type MemberSearchPurpose =
-  | { purpose: 'membership' }
-  | {
-      purpose: 'ticket';
-      eventId: string;
-      eventTitle: string;
-      ticketTierId: string;
-      ticketTierName: string;
-      priceLabel: string;
-    };
+  { purpose: 'membership' } | { purpose: 'ticket'; eventId: string; eventTitle: string };
+
+export interface TicketSelectionItem {
+  ticketTierId: string;
+  name: string;
+  quantity: number;
+  unitPriceLabel: string;
+}
 
 export type CollectPaymentParams =
   | {
@@ -24,9 +23,8 @@ export type CollectPaymentParams =
       memberName: string;
       eventId: string;
       eventTitle: string;
-      ticketTierId: string;
-      ticketTierName: string;
-      priceLabel: string;
+      items: readonly TicketSelectionItem[];
+      totalLabel: string;
     };
 
 export type RootStackParamList = {
@@ -35,6 +33,11 @@ export type RootStackParamList = {
   MemberSearch: MemberSearchPurpose;
   MembershipDetails: { memberId: string; memberName: string };
   MembershipPlans: { memberId: string; memberName: string };
-  EventTicketTiers: { eventId: string; eventTitle: string };
+  EventTicketQuantities: {
+    eventId: string;
+    eventTitle: string;
+    memberId: string;
+    memberName: string;
+  };
   CollectPayment: CollectPaymentParams;
 };

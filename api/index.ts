@@ -48,8 +48,8 @@ export const api = {
   createMembershipSetupIntent: (body: MembershipSetupIntentRequest) =>
     _createMembershipSetupIntent(getApiConfig(), body),
   createTerminalConnectionToken: () => _createTerminalConnectionToken(getApiConfig()),
-  createTicketPaymentIntent: (ticketTierId: string, body: TicketPaymentIntentRequest) =>
-    _createTicketPaymentIntent(getApiConfig(), ticketTierId, body),
+  createTicketPaymentIntent: (eventId: string, body: TicketPaymentIntentRequest) =>
+    _createTicketPaymentIntent(getApiConfig(), eventId, body),
   searchMembers: (query: string) => _searchMembers(getApiConfig(), query),
   signOut: () => _signOut(getApiConfig()),
 };

@@ -184,11 +184,13 @@ export interface ConnectionTokenResponse {
 }
 
 // =============================================================================
-// POST /tickets/:ticket_tier_id/payment_intent
+// POST /events/:event_id/tickets/payment_intent
 // =============================================================================
 
 export interface TicketPaymentIntentRequest {
   member_id: string;
+  /** Map of ticket_tier_id -> quantity, e.g. { [tierId]: 2 } — one order can span multiple tiers. */
+  tiers: Record<string, number>;
 }
 
 export interface TicketPaymentIntentResponse {

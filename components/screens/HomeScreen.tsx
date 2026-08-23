@@ -96,7 +96,8 @@ export function HomeScreen({ navigation }: Props) {
           <EventRow
             event={item}
             onPress={() =>
-              navigation.navigate('EventTicketTiers', {
+              navigation.navigate('MemberSearch', {
+                purpose: 'ticket',
                 eventId: item.id ?? '',
                 eventTitle: item.title,
               })

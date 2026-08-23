@@ -105,12 +105,12 @@ export function createTerminalConnectionToken(
 
 export function createTicketPaymentIntent(
   config: ApiClientConfig,
-  ticketTierId: string,
+  eventId: string,
   body: TicketPaymentIntentRequest
 ): Promise<TicketPaymentIntentResponse> {
   return request<TicketPaymentIntentResponse>(
     config,
-    `/api/v1/app/tickets/${ticketTierId}/payment_intent`,
+    `/api/v1/app/events/${eventId}/tickets/payment_intent`,
     { method: 'POST', body }
   );
 }
