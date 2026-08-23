@@ -109,6 +109,24 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
     void run();
   }
 
+  // Door-sale flow: a ticket seller works one event at a time, charging one
+  // person after another — so success sends them back to a fresh member
+  // search for the *same* event instead of all the way to Home. Membership
+  // sign-ups aren't repeated back-to-back the same way, so those still just
+  // go Home.
+  function handleDone() {
+    if (params.kind === 'ticket') {
+      navigation.popToTop();
+      navigation.navigate('MemberSearch', {
+        purpose: 'ticket',
+        eventId: params.eventId,
+        eventTitle: params.eventTitle,
+      });
+    } else {
+      navigation.popToTop();
+    }
+  }
+
   return (
     <View className="flex-1 bg-zinc-50">
       <ScreenHeader
@@ -169,8 +187,10 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
             </Text>
             <TouchableOpacity
               className="min-h-[44px] items-center justify-center rounded bg-blue-700 px-8 py-3 transition-transform duration-150 ease-in-out active:scale-[0.98]"
-              onPress={() => navigation.popToTop()}>
-              <Text className="text-base font-semibold text-zinc-100">Done</Text>
+              onPress={handleDone}>
+              <Text className="text-base font-semibold text-zinc-100">
+                {params.kind === 'ticket' ? 'Sell another ticket' : 'Done'}
+              </Text>
             </TouchableOpacity>
           </View>
         ) : phase === 'error' ? (
