@@ -32,28 +32,27 @@ export const DEFAULT_ENVIRONMENT: ApiEnvironment = 'local';
  */
 export function getBaseUrlForEnvironment(env: ApiEnvironment): string {
   if (env === 'local') {
-    const lanHost = readEnv('EXPO_PUBLIC_LOCAL_API_HOST');
+    const lanHost = process.env.EXPO_PUBLIC_LOCAL_API_HOST;
     if (lanHost) return `http://${lanHost}:4000`;
     return Platform.OS === 'android' ? 'http://10.0.2.2:4000' : 'http://localhost:4000';
   }
   return API_BASE_URLS[env];
 }
 
-/** Read a process.env value by name without triggering Expo's static EXPO_PUBLIC_ inlining. */
-function readEnv(key: string): string | undefined {
-  if (typeof process === 'undefined') return undefined;
-  return (process.env as Record<string, string | undefined>)[key];
-}
-
 /** Build-time default environment (EAS build profiles set EXPO_PUBLIC_API_ENVIRONMENT). */
 export function getDefaultEnvironment(): ApiEnvironment {
-  const env = readEnv('EXPO_PUBLIC_API_ENVIRONMENT') as ApiEnvironment | undefined;
-  if (env && env in API_BASE_URLS) return env;
+  // Must be a literal `process.env.EXPO_PUBLIC_*` member expression (not a
+  // dynamic/bracket lookup) — Expo's Babel plugin only inlines/references
+  // EXPO_PUBLIC_ vars it can statically match by name, so reading this
+  // through a helper keyed by a runtime string silently always resolves to
+  // undefined in EAS builds, regardless of what eas.json sets.
+  const env = process.env.EXPO_PUBLIC_API_ENVIRONMENT as ApiEnvironment | undefined;
+  if (env && isValidEnvironment(env)) return env;
   return DEFAULT_ENVIRONMENT;
 }
 
 export function isValidEnvironment(value: string): value is ApiEnvironment {
-  return value in API_BASE_URLS;
+  return Object.prototype.hasOwnProperty.call(API_BASE_URLS, value);
 }
 
 /**
