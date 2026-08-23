@@ -11,6 +11,12 @@
 # Note: Stripe Tap to Pay on Android needs a real NFC-capable device — the
 # emulator has no NFC, so use this for the sign-in/events/checkout UI, and
 # Stripe Terminal's simulated reader for the payment collection flow.
+#
+# Set DEVICE_ONLY=1 (or use `make android-device`) to install straight onto a
+# USB-connected physical device instead of booting/using an emulator — this is
+# how you get real Tap to Pay NFC hardware for testing. Requires USB debugging
+# enabled on the phone (Settings > Developer options) and the device already
+# authorized (`adb devices` shows it as "device", not "unauthorized").
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -85,11 +91,43 @@ fi
 echo "==> Regenerating native Android project (expo prebuild --clean)..."
 npx expo prebuild --clean --platform android
 
-echo "==> Checking for a connected device or running emulator..."
 DEVICE_ARG=()
-if "$ADB" devices | grep -qE "(device|emulator-[0-9]+)$"; then
+DEVICE_ONLY="${DEVICE_ONLY:-}"
+
+if [[ -n "$DEVICE_ONLY" ]]; then
+  echo "==> Checking for a connected physical device (DEVICE_ONLY=1, no emulator fallback)..."
+  PHYSICAL_SERIALS=()
+  while IFS=$'\t' read -r serial state _rest; do
+    [[ "$state" == "device" ]] || continue
+    [[ "$serial" == emulator-* ]] && continue
+    PHYSICAL_SERIALS+=("$serial")
+  done < <("$ADB" devices | tail -n +2)
+
+  if [[ ${#PHYSICAL_SERIALS[@]} -eq 0 ]]; then
+    echo "error: no physical Android device found via adb." >&2
+    echo "  1. Connect your phone via USB." >&2
+    echo "  2. Enable USB debugging: Settings > About phone > tap 'Build number' 7x to" >&2
+    echo "     unlock Developer options, then Settings > Developer options > USB debugging." >&2
+    echo "  3. Accept the \"Allow USB debugging?\" prompt that appears on the phone." >&2
+    echo "  Verify with: adb devices — it should list your device as \"device\", not" >&2
+    echo "  \"unauthorized\" (re-accept the prompt) or missing entirely (try a different" >&2
+    echo "  USB cable/port, or run 'adb kill-server && adb start-server')." >&2
+    exit 1
+  fi
+
+  if [[ ${#PHYSICAL_SERIALS[@]} -gt 1 ]]; then
+    echo "error: multiple physical devices connected — set ANDROID_SERIAL to pick one:" >&2
+    printf '  %s\n' "${PHYSICAL_SERIALS[@]}" >&2
+    exit 1
+  fi
+
+  echo "  Using connected device: ${PHYSICAL_SERIALS[0]}"
+  DEVICE_ARG=(--device "${PHYSICAL_SERIALS[0]}")
+elif "$ADB" devices | grep -qE "(device|emulator-[0-9]+)$"; then
+  echo "==> Checking for a connected device or running emulator..."
   echo "  A device/emulator is already connected."
 else
+  echo "==> Checking for a connected device or running emulator..."
   AVD_NAME="${ANDROID_AVD_NAME:-}"
   AVD_LIST="$("$EMULATOR" -list-avds 2>/dev/null || true)"
 

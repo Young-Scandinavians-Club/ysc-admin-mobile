@@ -69,6 +69,14 @@ make ios      # or: make android — defaults to ENV=local (localhost:4000)
 Both `make ios`/`make android` check for prerequisites, run `expo prebuild`,
 and launch the app. See `scripts/run-ios.sh` / `scripts/run-android.sh`.
 
+To install straight onto a USB-connected physical Android device (needed for
+real Stripe Terminal Tap to Pay/NFC — the emulator has no NFC hardware),
+enable USB debugging on the phone and run:
+
+```bash
+make android-device   # skips the emulator entirely; errors if no device is found
+```
+
 ## Other commands
 
 ```bash
