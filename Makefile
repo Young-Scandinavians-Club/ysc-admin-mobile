@@ -1,4 +1,4 @@
-.PHONY: help lint format test typecheck ios android
+.PHONY: help lint format test typecheck ios android web
 
 .DEFAULT_GOAL := help
 
@@ -17,8 +17,16 @@ typecheck: ## Run type checker
 test: ## Run tests
 	npm run -s test
 
-ios: ## Run the app in the iOS Simulator (checks/installs prerequisites first, macOS only)
-	./scripts/run-ios.sh
+# Backend environment for ios/android/web: local | sandbox | prod (default local,
+# i.e. http://localhost:4000 — run ysc.org locally alongside this app).
+# e.g. `make ios ENV=sandbox`, `make android ENV=prod`.
+ENV ?= local
 
-android: ## Run the app in an Android Emulator (checks/installs prerequisites first)
-	./scripts/run-android.sh
+ios: ## Run the app in the iOS Simulator (checks/installs prerequisites first, macOS only). ENV=local|sandbox|prod
+	@API_ENV=$(ENV) ./scripts/run-ios.sh
+
+android: ## Run the app in an Android Emulator (checks/installs prerequisites first). ENV=local|sandbox|prod
+	@API_ENV=$(ENV) ./scripts/run-android.sh
+
+web: ## Run the app in a browser via expo start --web. ENV=local|sandbox|prod
+	@EXPO_PUBLIC_API_ENVIRONMENT=$(ENV) npm run -s web

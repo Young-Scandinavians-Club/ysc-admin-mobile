@@ -40,20 +40,30 @@ Three environments, matching the backend's deploys:
 
 | Environment | Base URL | Stripe mode |
 | --- | --- | --- |
-| `local` | `http://localhost:4000` (`10.0.2.2:4000` on Android emulator) | test |
-| `sandbox` (default) | `https://ysc-sandbox.fly.dev` | test |
+| `local` (default) | `http://localhost:4000` (`10.0.2.2:4000` on Android emulator) | test |
+| `sandbox` | `https://ysc-sandbox.fly.dev` | test |
 | `prod` | `https://ysc.org` | live |
 
-All development and testing should happen against **sandbox** — never
-`prod`. The environment is set at build time via `EXPO_PUBLIC_API_ENVIRONMENT`
-(see `eas.json` build profiles) and defaults to `sandbox` if unset, so a
-stray build never accidentally talks to production.
+`make ios`/`make android`/`make web` default to **local** — run `ysc.org`
+locally (`mix phx.server`) alongside this app. Pick a different one with
+`ENV=`, e.g.:
+
+```bash
+make ios ENV=sandbox
+make android ENV=prod
+```
+
+Never run against `prod` unless you specifically mean to. For a real EAS
+build, the environment is set by the build profile instead (see `eas.json`:
+`development`/`preview` → sandbox, `production` → prod), regardless of this
+default — see `api/config.ts`'s `DEFAULT_ENVIRONMENT` for the exact fallback
+rules.
 
 ## Setup
 
 ```bash
 npm install
-make ios      # or: make android
+make ios      # or: make android — defaults to ENV=local (localhost:4000)
 ```
 
 Both `make ios`/`make android` check for prerequisites, run `expo prebuild`,

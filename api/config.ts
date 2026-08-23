@@ -2,9 +2,9 @@ import { Platform } from 'react-native';
 
 /** Named API environments with fixed base URLs — same three the backend deploys to. */
 export const API_BASE_URLS = {
-  /** Local dev: localhost (iOS Simulator) or 10.0.2.2 (Android emulator) */
+  /** Local dev: localhost (iOS Simulator) or 10.0.2.2 (Android emulator). Default. */
   local: 'http://localhost:4000',
-  /** Sandbox: https://ysc-sandbox.fly.dev — Stripe in test mode. Default for all development/testing. */
+  /** Sandbox: https://ysc-sandbox.fly.dev — Stripe in test mode. */
   sandbox: 'https://ysc-sandbox.fly.dev',
   /** Production: https://ysc.org */
   prod: 'https://ysc.org',
@@ -12,8 +12,15 @@ export const API_BASE_URLS = {
 
 export type ApiEnvironment = keyof typeof API_BASE_URLS;
 
-/** Default environment: sandbox, so a fresh install/build never talks to production by accident. */
-export const DEFAULT_ENVIRONMENT: ApiEnvironment = 'sandbox';
+/**
+ * Default environment when nothing else specifies one — local, for the
+ * day-to-day dev loop against a locally running backend. EAS build profiles
+ * (see eas.json) explicitly set EXPO_PUBLIC_API_ENVIRONMENT to sandbox/prod
+ * for development/preview/production builds regardless, so this default
+ * never affects a real distributed build — only an ad-hoc `expo start`/
+ * `expo run:*` invocation that bypasses the Makefile's own ENV handling.
+ */
+export const DEFAULT_ENVIRONMENT: ApiEnvironment = 'local';
 
 /**
  * Resolved base URL for an environment. Use this instead of API_BASE_URLS when making requests:

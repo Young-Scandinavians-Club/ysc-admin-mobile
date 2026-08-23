@@ -3,12 +3,28 @@
 # Defaults to an iPhone (this is an admin/volunteer phone app, not a tablet kiosk).
 # Override with: IOS_SIMULATOR_DEVICE="iPhone 16 Pro" make ios
 #
+# Backend environment defaults to local. Override with:
+#   make ios ENV=local       # http://localhost:4000 (default)
+#   make ios ENV=sandbox     # https://ysc-sandbox.fly.dev
+#   make ios ENV=prod        # https://ysc.org
+#
 # Note: Stripe Tap to Pay on iPhone cannot be tested in the Simulator (no NFC) —
 # use this for the sign-in/events/checkout UI, and Stripe Terminal's simulated
 # reader for the payment collection flow. A physical iPhone plus the granted
 # Apple entitlement is required to test a real card tap.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+API_ENV="${API_ENV:-local}"
+case "$API_ENV" in
+  local | sandbox | prod) ;;
+  *)
+    echo "error: invalid ENV '$API_ENV' — expected local, sandbox, or prod." >&2
+    exit 1
+    ;;
+esac
+export EXPO_PUBLIC_API_ENVIRONMENT="$API_ENV"
+echo "==> Backend environment: $API_ENV"
 
 if [[ "$(uname)" != "Darwin" ]]; then
   echo "error: the iOS Simulator only runs on macOS (you're on $(uname))." >&2

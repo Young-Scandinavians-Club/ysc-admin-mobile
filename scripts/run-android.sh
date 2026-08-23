@@ -3,11 +3,27 @@
 # Defaults to a phone AVD (this is an admin/volunteer phone app, not a tablet kiosk).
 # Override with: ANDROID_AVD_NAME=Pixel_7_API_34 make android
 #
+# Backend environment defaults to local. Override with:
+#   make android ENV=local     # http://10.0.2.2:4000, i.e. the host's localhost:4000 (default)
+#   make android ENV=sandbox   # https://ysc-sandbox.fly.dev
+#   make android ENV=prod      # https://ysc.org
+#
 # Note: Stripe Tap to Pay on Android needs a real NFC-capable device — the
 # emulator has no NFC, so use this for the sign-in/events/checkout UI, and
 # Stripe Terminal's simulated reader for the payment collection flow.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+API_ENV="${API_ENV:-local}"
+case "$API_ENV" in
+  local | sandbox | prod) ;;
+  *)
+    echo "error: invalid ENV '$API_ENV' — expected local, sandbox, or prod." >&2
+    exit 1
+    ;;
+esac
+export EXPO_PUBLIC_API_ENVIRONMENT="$API_ENV"
+echo "==> Backend environment: $API_ENV"
 
 ANDROID_SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 if [[ -z "$ANDROID_SDK" || ! -d "$ANDROID_SDK" ]]; then
