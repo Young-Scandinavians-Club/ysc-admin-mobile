@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 
 import { api, ApiClientError } from '@/api';
 import type { RootStackParamList } from '@/components/navigation/types';
 import { ScreenHeader } from '@/components/screens/ScreenHeader';
 import { useTapToPayCollector } from '@/lib/stripe-terminal';
+import { DEFAULT_TEST_CARD, TEST_CARDS } from '@/lib/testCards';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CollectPayment'>;
 
@@ -28,6 +29,13 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
   const collector = useTapToPayCollector();
   const [localPhase, setLocalPhase] = useState<LocalPhase>('preparing');
   const [error, setError] = useState<string | null>(null);
+  const [testCardId, setTestCardId] = useState(DEFAULT_TEST_CARD.id);
+  // Read via a ref (not a `run` dependency) so picking a different test card
+  // never re-triggers the mount-time auto-run — it only applies on retry.
+  const testCardIdRef = useRef(testCardId);
+  useEffect(() => {
+    testCardIdRef.current = testCardId;
+  }, [testCardId]);
 
   const title = params.kind === 'ticket' ? params.eventTitle : params.planName;
   const amountLabel = params.kind === 'ticket' ? params.totalLabel : params.amountLabel;
@@ -44,6 +52,8 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
       : localPhase;
 
   const run = useCallback(async () => {
+    const testCard = TEST_CARDS.find((c) => c.id === testCardIdRef.current) ?? DEFAULT_TEST_CARD;
+
     try {
       if (params.kind === 'ticket') {
         const tiers: Record<string, number> = {};
@@ -56,12 +66,15 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
           tiers,
         });
 
-        const outcome = await collector.collectPayment(intent.client_secret);
+        const outcome = await collector.collectPayment(intent.client_secret, testCard.cardNumber);
         if (!outcome.success) throw new Error(outcome.error);
       } else {
         const setupIntent = await api.createMembershipSetupIntent({ member_id: params.memberId });
 
-        const outcome = await collector.collectSetup(setupIntent.client_secret);
+        const outcome = await collector.collectSetup(
+          setupIntent.client_secret,
+          testCard.cardNumber
+        );
         if (!outcome.success) throw new Error(outcome.error);
 
         setLocalPhase('finalizing');
@@ -118,6 +131,33 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
             </View>
           )}
         </View>
+
+        {__DEV__ && (
+          <View className="mb-6 items-center">
+            <Text className="mb-2 text-xs uppercase tracking-wide text-zinc-400">
+              Dev: test card (used on next attempt)
+            </Text>
+            <View className="flex-row flex-wrap justify-center gap-2">
+              {TEST_CARDS.map((card) => (
+                <TouchableOpacity
+                  key={card.id}
+                  className={`rounded-full border px-3 py-1.5 ${
+                    testCardId === card.id
+                      ? 'border-blue-700 bg-blue-700'
+                      : 'border-zinc-200 bg-white'
+                  }`}
+                  onPress={() => setTestCardId(card.id)}>
+                  <Text
+                    className={`text-xs font-medium ${
+                      testCardId === card.id ? 'text-zinc-100' : 'text-zinc-600'
+                    }`}>
+                    {card.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
 
         {phase === 'success' ? (
           <View className="items-center">

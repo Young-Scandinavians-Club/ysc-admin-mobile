@@ -23,6 +23,7 @@
     "expo": "^57.0.9",
     "expo-build-properties": "~57.0.13",
     "expo-dev-client": "~57.0.14",
+    "expo-device": "~57.0.1",
     "expo-secure-store": "~57.0.1",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "^57.0.2",

@@ -17,11 +17,17 @@ export function useTapToPayCollector() {
   return {
     step: 'idle' as CollectStep,
     error: null as string | null,
-    collectPayment: async (): Promise<CollectPaymentOutcome> => ({
+    collectPayment: async (
+      _clientSecret: string,
+      _testCardNumber?: string
+    ): Promise<CollectPaymentOutcome> => ({
       success: false,
       error: UNSUPPORTED,
     }),
-    collectSetup: async (): Promise<CollectSetupOutcome> => ({
+    collectSetup: async (
+      _clientSecret: string,
+      _testCardNumber?: string
+    ): Promise<CollectSetupOutcome> => ({
       success: false,
       error: UNSUPPORTED,
     }),

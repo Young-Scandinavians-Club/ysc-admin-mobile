@@ -1,4 +1,5 @@
 import { useStripeTerminal } from '@stripe/stripe-terminal-react-native';
+import { isDevice } from 'expo-device';
 import { useCallback, useRef, useState } from 'react';
 
 import { api } from '@/api';
@@ -20,6 +21,18 @@ export type CollectSetupOutcome =
  * full flow against test-mode Stripe), false in production builds.
  */
 const SIMULATED = __DEV__;
+
+/**
+ * Tap to Pay needs real NFC hardware just to discover a reader — Stripe's own
+ * `simulated` flag doesn't bypass that, and neither the iOS Simulator nor the
+ * Android emulator have NFC. In dev builds running on one of those (not a
+ * real device), fall back to the `internet` discovery method instead (a
+ * simulated WisePOS E reader) so the rest of this flow — connect, collect,
+ * confirm — is still fully exercisable with zero hardware. On a real device
+ * this stays `tapToPay` as normal. See
+ * https://stripe-stripe-terminal-react-native.mintlify.app/guides/testing.
+ */
+const DISCOVERY_METHOD = __DEV__ && !isDevice ? 'internet' : 'tapToPay';
 
 export function useTapToPayCollector() {
   const terminal = useStripeTerminal();
@@ -46,20 +59,40 @@ export function useTapToPayCollector() {
 
     const { location_id: locationId } = await api.createTerminalConnectionToken();
 
-    const { error: connectError } = await terminal.easyConnect({
-      discoveryMethod: 'tapToPay',
-      locationId,
-      simulated: SIMULATED,
-    });
+    const { error: connectError } =
+      DISCOVERY_METHOD === 'internet'
+        ? await terminal.easyConnect({
+            discoveryMethod: 'internet',
+            locationId,
+            simulated: SIMULATED,
+          })
+        : await terminal.easyConnect({
+            discoveryMethod: 'tapToPay',
+            locationId,
+            simulated: SIMULATED,
+          });
     if (connectError) throw new Error(connectError.message);
   }, [terminal]);
 
+  // Feeds a Stripe test card number to the simulated reader so a dev build
+  // can complete "collection" without a real card/NFC tap — only meaningful
+  // (and only ever called) when SIMULATED is true, i.e. dev builds.
+  const applyTestCard = useCallback(
+    async (testCardNumber: string | undefined) => {
+      if (!__DEV__ || !testCardNumber) return;
+      const { error: cardError } = await terminal.setSimulatedCard(testCardNumber);
+      if (cardError) throw new Error(cardError.message);
+    },
+    [terminal]
+  );
+
   const collectPayment = useCallback(
-    async (clientSecret: string): Promise<CollectPaymentOutcome> => {
+    async (clientSecret: string, testCardNumber?: string): Promise<CollectPaymentOutcome> => {
       setError(null);
       try {
         setStep('connecting');
         await ensureConnectedReader();
+        await applyTestCard(testCardNumber);
 
         const retrieved = await terminal.retrievePaymentIntent(clientSecret);
         if (retrieved.error) throw new Error(retrieved.error.message);
@@ -85,15 +118,16 @@ export function useTapToPayCollector() {
         return { success: false, error: message };
       }
     },
-    [terminal, ensureConnectedReader]
+    [terminal, ensureConnectedReader, applyTestCard]
   );
 
   const collectSetup = useCallback(
-    async (clientSecret: string): Promise<CollectSetupOutcome> => {
+    async (clientSecret: string, testCardNumber?: string): Promise<CollectSetupOutcome> => {
       setError(null);
       try {
         setStep('connecting');
         await ensureConnectedReader();
+        await applyTestCard(testCardNumber);
 
         const retrieved = await terminal.retrieveSetupIntent(clientSecret);
         if (retrieved.error) throw new Error(retrieved.error.message);
@@ -122,7 +156,7 @@ export function useTapToPayCollector() {
         return { success: false, error: message };
       }
     },
-    [terminal, ensureConnectedReader]
+    [terminal, ensureConnectedReader, applyTestCard]
   );
 
   return { step, error, collectPayment, collectSetup, reset };
