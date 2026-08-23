@@ -153,6 +153,14 @@ export function useTapToPayCollector() {
         setStep('collecting');
         const collected = await terminal.collectSetupIntentPaymentMethod({
           setupIntent: retrieved.setupIntent,
+          // Required by Stripe/card-network rules for saving a card via
+          // Terminal. "limited" (not "always") because this card is being
+          // saved specifically to bill this membership's renewals, not as a
+          // general saved card the member would see in a checkout flow
+          // elsewhere — matches Stripe's own default for subscription-mode
+          // saves. See https://docs.stripe.com/terminal/features/saving-payment-details/save-directly
+          allowRedisplay: 'limited',
+          collectionReason: 'saveCard',
         });
         if (collected.error) throw new Error(collected.error.message);
 
