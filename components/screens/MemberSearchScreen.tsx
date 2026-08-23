@@ -46,7 +46,11 @@ export function MemberSearchScreen({ navigation, route }: Props) {
   function selectMember(member: Member) {
     const name = memberName(member);
     if (params.purpose === 'membership') {
-      navigation.navigate('MembershipPlans', { memberId: member.id, memberName: name });
+      if (member.has_active_membership) {
+        navigation.navigate('MembershipDetails', { memberId: member.id, memberName: name });
+      } else {
+        navigation.navigate('MembershipPlans', { memberId: member.id, memberName: name });
+      }
     } else {
       navigation.navigate('CollectPayment', {
         kind: 'ticket',

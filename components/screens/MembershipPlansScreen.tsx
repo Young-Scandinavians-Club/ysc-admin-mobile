@@ -11,7 +11,10 @@ import { ScreenHeader } from '@/components/screens/ScreenHeader';
 type Props = NativeStackScreenProps<RootStackParamList, 'MembershipPlans'>;
 
 function formatAmount(plan: MembershipPlan): string {
-  const amount = (plan.amount / 100).toLocaleString(undefined, {
+  // Unlike Stripe's own amounts (cents), `config :ysc, :membership_plans`
+  // and this endpoint's JSON both store/return whole currency units, e.g.
+  // `45` for $45 — see lib/ysc_web/controllers/api/app_memberships_json.ex.
+  const amount = plan.amount.toLocaleString(undefined, {
     style: 'currency',
     currency: plan.currency.toUpperCase(),
   });

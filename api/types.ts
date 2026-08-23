@@ -145,6 +145,20 @@ export interface MembershipSetupIntentResponse {
 }
 
 // =============================================================================
+// GET /memberships/status
+// =============================================================================
+
+export type MembershipStatusResponse =
+  | { has_active_membership: false }
+  | {
+      has_active_membership: true;
+      plan_type: string | null;
+      plan_name: string;
+      renewal_date: string | null;
+      cancel_at_period_end: boolean;
+    };
+
+// =============================================================================
 // GET /members/search
 // =============================================================================
 

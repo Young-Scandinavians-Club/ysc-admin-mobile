@@ -7,6 +7,7 @@ import type {
   MembershipPlansResponse,
   MembershipSetupIntentRequest,
   MembershipSetupIntentResponse,
+  MembershipStatusResponse,
   MembersSearchResponse,
   PasswordSessionResponse,
   SubscribeRequest,
@@ -63,6 +64,15 @@ export function subscribeMembership(
   return request<SubscribeResponse>(config, '/api/v1/app/memberships/subscribe', {
     method: 'POST',
     body,
+  });
+}
+
+export function membershipStatus(
+  config: ApiClientConfig,
+  memberId: string
+): Promise<MembershipStatusResponse> {
+  return request<MembershipStatusResponse>(config, '/api/v1/app/memberships/status', {
+    searchParams: { member_id: memberId },
   });
 }
 

@@ -7,6 +7,7 @@ import { CollectPaymentScreen } from '@/components/screens/CollectPaymentScreen'
 import { EventTicketTiersScreen } from '@/components/screens/EventTicketTiersScreen';
 import { HomeScreen } from '@/components/screens/HomeScreen';
 import { MemberSearchScreen } from '@/components/screens/MemberSearchScreen';
+import { MembershipDetailsScreen } from '@/components/screens/MembershipDetailsScreen';
 import { MembershipPlansScreen } from '@/components/screens/MembershipPlansScreen';
 import { SignInScreen } from '@/components/screens/SignInScreen';
 import { useAuth } from '@/lib/auth-context';
@@ -34,6 +35,7 @@ export function AppNavigator() {
           <>
             <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="MemberSearch" component={MemberSearchScreen} />
+            <Stack.Screen name="MembershipDetails" component={MembershipDetailsScreen} />
             <Stack.Screen name="MembershipPlans" component={MembershipPlansScreen} />
             <Stack.Screen name="EventTicketTiers" component={EventTicketTiersScreen} />
             <Stack.Screen name="CollectPayment" component={CollectPaymentScreen} />

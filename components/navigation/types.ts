@@ -33,6 +33,7 @@ export type RootStackParamList = {
   SignIn: undefined;
   Home: undefined;
   MemberSearch: MemberSearchPurpose;
+  MembershipDetails: { memberId: string; memberName: string };
   MembershipPlans: { memberId: string; memberName: string };
   EventTicketTiers: { eventId: string; eventTitle: string };
   CollectPayment: CollectPaymentParams;

@@ -5,6 +5,7 @@ import {
   createTicketPaymentIntent as _createTicketPaymentIntent,
   eventsList as _eventsList,
   membershipPlans as _membershipPlans,
+  membershipStatus as _membershipStatus,
   searchMembers as _searchMembers,
   signOut as _signOut,
   subscribeMembership as _subscribeMembership,
@@ -42,6 +43,7 @@ export type { ApiClientConfig, ApiEnvironment } from './config';
 export const api = {
   eventsList: (params: EventsListParams = {}) => _eventsList(getApiConfig(), params),
   membershipPlans: () => _membershipPlans(getApiConfig()),
+  membershipStatus: (memberId: string) => _membershipStatus(getApiConfig(), memberId),
   subscribeMembership: (body: SubscribeRequest) => _subscribeMembership(getApiConfig(), body),
   createMembershipSetupIntent: (body: MembershipSetupIntentRequest) =>
     _createMembershipSetupIntent(getApiConfig(), body),
@@ -71,6 +73,7 @@ export type {
   MembershipPlansResponse,
   MembershipSetupIntentRequest,
   MembershipSetupIntentResponse,
+  MembershipStatusResponse,
   MembersSearchResponse,
   PasswordSessionResponse,
   SubscribeRequest,
