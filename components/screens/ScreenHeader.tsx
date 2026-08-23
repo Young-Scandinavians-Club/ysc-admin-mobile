@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export function ScreenHeader({
   title,
@@ -10,8 +11,12 @@ export function ScreenHeader({
   subtitle?: string;
   onBack: () => void;
 }) {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View className="flex-row items-center border-b border-zinc-100 bg-white px-2 py-3">
+    <View
+      className="flex-row items-center border-b border-zinc-100 bg-white px-2 py-3"
+      style={{ paddingTop: insets.top + 12 }}>
       <TouchableOpacity
         className="h-11 w-11 items-center justify-center"
         onPress={onBack}

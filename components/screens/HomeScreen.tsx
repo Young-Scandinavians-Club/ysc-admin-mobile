@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import useSWR from 'swr';
 
 import { api } from '@/api';
@@ -64,13 +65,16 @@ function EventRow({ event, onPress }: { event: Event; onPress: () => void }) {
 
 export function HomeScreen({ navigation }: Props) {
   const { user, signOut } = useAuth();
+  const insets = useSafeAreaInsets();
   const { data, error, isLoading, isValidating, mutate } = useSWR('events', () =>
     api.eventsList({ page_size: 50 })
   );
 
   return (
     <View className="flex-1 bg-zinc-50">
-      <View className="flex-row items-center justify-between border-b border-zinc-100 bg-white px-6 py-4">
+      <View
+        className="flex-row items-center justify-between border-b border-zinc-100 bg-white px-6 py-4"
+        style={{ paddingTop: insets.top + 16 }}>
         <View className="flex-row items-center">
           {user && <Avatar uri={user.avatar_url} size={36} />}
           <View className="ml-3">
@@ -108,7 +112,7 @@ export function HomeScreen({ navigation }: Props) {
             }
           />
         )}
-        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 32 }}
         refreshControl={
           <RefreshControl refreshing={isValidating} onRefresh={() => void mutate()} />
         }

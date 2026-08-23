@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import { ActivityIndicator, FlatList, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import useSWR from 'swr';
 
 import { api } from '@/api';
@@ -50,6 +51,7 @@ function totalLabelFor(items: TicketSelectionItem[]): string {
 
 export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
   const { eventId, eventTitle, memberId, memberName } = route.params;
+  const insets = useSafeAreaInsets();
   const { data, error, isLoading } = useSWR('events', () => api.eventsList({ page_size: 50 }));
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
@@ -169,7 +171,9 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
         />
       )}
 
-      <View className="border-t border-zinc-100 bg-white px-6 py-4">
+      <View
+        className="border-t border-zinc-100 bg-white px-6 py-4"
+        style={{ paddingBottom: insets.bottom + 16 }}>
         <TouchableOpacity
           className={`min-h-[44px] items-center justify-center rounded bg-blue-700 py-3 transition-transform duration-150 ease-in-out active:scale-[0.98] ${
             totalCount === 0 ? 'opacity-50' : ''
