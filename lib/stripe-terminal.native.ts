@@ -33,14 +33,16 @@ export function useTapToPayCollector() {
   }, []);
 
   const ensureConnectedReader = useCallback(async () => {
-    const connectionStatus = await terminal.getConnectionStatus();
-    if (connectionStatus === 'connected') return;
-
+    // The SDK requires initialize() before any other method — including
+    // getConnectionStatus() — so this must run first, not just before connect.
     if (!initialized.current) {
       const { error: initError } = await terminal.initialize();
       if (initError) throw new Error(initError.message);
       initialized.current = true;
     }
+
+    const connectionStatus = await terminal.getConnectionStatus();
+    if (connectionStatus === 'connected') return;
 
     const { location_id: locationId } = await api.createTerminalConnectionToken();
 
