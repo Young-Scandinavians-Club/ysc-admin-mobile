@@ -36,20 +36,30 @@ export function MemberSearchScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (tooShort) return;
 
+    let cancelled = false;
     const timer = setTimeout(() => {
       setLoading(true);
       setError(null);
       api
         .searchMembers(trimmedQuery)
-        .then((response) => setResults([...response.data]))
+        .then((response) => {
+          if (cancelled) return;
+          setResults([...response.data]);
+        })
         .catch((err) => {
+          if (cancelled) return;
           setError(err instanceof ApiClientError ? err.message : 'Search failed');
           setResults([]);
         })
-        .finally(() => setLoading(false));
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [trimmedQuery, tooShort]);
 
   function selectMember(member: Member) {
