@@ -25,9 +25,15 @@ export const DEFAULT_ENVIRONMENT: ApiEnvironment = 'local';
 /**
  * Resolved base URL for an environment. Use this instead of API_BASE_URLS when making requests:
  * on Android emulator, "local" resolves to 10.0.2.2:4000 (host machine); on iOS Simulator, localhost works.
+ *
+ * On a physical device neither of those reaches the dev machine — set
+ * EXPO_PUBLIC_LOCAL_API_HOST (the dev machine's LAN IP) to override both.
+ * `make android-device` sets this automatically; see scripts/run-android.sh.
  */
 export function getBaseUrlForEnvironment(env: ApiEnvironment): string {
   if (env === 'local') {
+    const lanHost = readEnv('EXPO_PUBLIC_LOCAL_API_HOST');
+    if (lanHost) return `http://${lanHost}:4000`;
     return Platform.OS === 'android' ? 'http://10.0.2.2:4000' : 'http://localhost:4000';
   }
   return API_BASE_URLS[env];

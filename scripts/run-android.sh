@@ -17,6 +17,11 @@
 # how you get real Tap to Pay NFC hardware for testing. Requires USB debugging
 # enabled on the phone (Settings > Developer options) and the device already
 # authorized (`adb devices` shows it as "device", not "unauthorized").
+#
+# For DEVICE_ONLY, this auto-detects the dev machine's LAN IP so the device
+# can reach Metro's bundle server and (with ENV=local) the API over Wi-Fi —
+# override with HOST=<ip> if autodetection picks the wrong network interface,
+# e.g. `make android-device HOST=192.168.0.126`.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -28,6 +33,27 @@ case "$API_ENV" in
     exit 1
     ;;
 esac
+
+# Best-effort LAN IP autodetection for physical-device testing (DEVICE_ONLY):
+# neither "localhost" nor the Android emulator's 10.0.2.2 alias reaches the
+# dev machine from a real phone on Wi-Fi, so both Metro's bundle server and
+# ENV=local API calls need the dev machine's actual LAN IP instead.
+detect_lan_ip() {
+  local ip=""
+  if [[ "$(uname)" == "Darwin" ]]; then
+    for iface in en0 en1 en2; do
+      ip="$(ipconfig getifaddr "$iface" 2>/dev/null || true)"
+      [[ -n "$ip" ]] && break
+    done
+  fi
+  if [[ -z "$ip" ]] && command -v ip >/dev/null 2>&1; then
+    ip="$(ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p' | head -n1)"
+  fi
+  if [[ -z "$ip" ]] && command -v hostname >/dev/null 2>&1; then
+    ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  fi
+  echo "$ip"
+}
 export EXPO_PUBLIC_API_ENVIRONMENT="$API_ENV"
 echo "==> Backend environment: $API_ENV"
 
@@ -183,6 +209,30 @@ else
   echo "  Emulator ready."
 
   DEVICE_ARG=(--device "$AVD_NAME")
+fi
+
+if [[ -n "$DEVICE_ONLY" ]]; then
+  HOST="${HOST:-}"
+  if [[ -z "$HOST" ]]; then
+    HOST="$(detect_lan_ip)"
+    if [[ -n "$HOST" ]]; then
+      echo "==> Auto-detected LAN IP: $HOST (override with HOST=<ip>)"
+    else
+      echo "warning: couldn't auto-detect a LAN IP — Metro's bundle server and" >&2
+      echo "  ENV=local API calls may not reach this machine from the device." >&2
+      echo "  Set HOST=<this-machine's-LAN-IP> explicitly if the app fails to load." >&2
+    fi
+  else
+    echo "==> Using LAN IP: $HOST"
+  fi
+
+  if [[ -n "$HOST" ]]; then
+    # Lets Metro advertise this IP for bundle loading over Wi-Fi...
+    export REACT_NATIVE_PACKAGER_HOSTNAME="$HOST"
+    # ...and lets the app's own ENV=local API calls reach this machine too
+    # (see api/config.ts's getBaseUrlForEnvironment).
+    export EXPO_PUBLIC_LOCAL_API_HOST="$HOST"
+  fi
 fi
 
 echo "==> Building and launching the app (npx expo run:android)..."

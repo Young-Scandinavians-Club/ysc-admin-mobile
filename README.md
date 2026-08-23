@@ -77,6 +77,12 @@ enable USB debugging on the phone and run:
 make android-device   # skips the emulator entirely; errors if no device is found
 ```
 
+`android-device` auto-detects this machine's LAN IP so the phone can reach
+Metro's bundle server and (with `ENV=local`) the API over Wi-Fi — override
+with `HOST=<ip>` if autodetection picks the wrong network interface, e.g.
+`make android-device HOST=192.168.0.126`. If avatar/event images don't load,
+the backend needs the same IP too — see `ysc.org`'s `make dev HOST=<ip>`.
+
 ## Other commands
 
 ```bash

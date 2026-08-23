@@ -22,14 +22,19 @@ test: ## Run tests
 # e.g. `make ios ENV=sandbox`, `make android ENV=prod`.
 ENV ?= local
 
+# LAN IP for `android-device` (auto-detected if left unset) — override when
+# autodetection picks the wrong network interface, e.g.
+# `make android-device HOST=192.168.0.126`.
+HOST ?=
+
 ios: ## Run the app in the iOS Simulator (checks/installs prerequisites first, macOS only). ENV=local|sandbox|prod
 	@API_ENV=$(ENV) ./scripts/run-ios.sh
 
 android: ## Run the app in an Android Emulator (checks/installs prerequisites first). ENV=local|sandbox|prod
 	@API_ENV=$(ENV) ./scripts/run-android.sh
 
-android-device: ## Install & run on a USB-connected physical Android device (needed for real Tap to Pay/NFC). ENV=local|sandbox|prod
-	@API_ENV=$(ENV) DEVICE_ONLY=1 ./scripts/run-android.sh
+android-device: ## Install & run on a USB-connected physical Android device (needed for real Tap to Pay/NFC). ENV=local|sandbox|prod HOST=<lan-ip> (auto-detected if omitted)
+	@API_ENV=$(ENV) DEVICE_ONLY=1 HOST=$(HOST) ./scripts/run-android.sh
 
 web: ## Run the app in a browser via expo start --web. ENV=local|sandbox|prod
 	@EXPO_PUBLIC_API_ENVIRONMENT=$(ENV) npm run -s web
