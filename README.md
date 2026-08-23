@@ -6,14 +6,15 @@ payments via Stripe Tap to Pay for events and memberships. Talks to the
 
 ## Status
 
-- **Sign-in**: email + password works end-to-end. Google, Facebook, and
-  passkey sign-in are stubbed in the UI ("coming soon") pending their backend
-  endpoints.
+- **Sign-in**: opens the real ysc.org login page in a system browser tab, so
+  every method the website supports (password, Google, Facebook) works —
+  the app never implements its own auth forms. Passkey sign-in works the
+  same way once the website supports it in that flow.
 - **Events**: list view wired to the backend.
-- **Tap-to-pay checkout / membership sign-up**: not yet built — the backend
-  endpoints exist (`/tickets/:id/payment_intent`, `/memberships/subscribe`,
-  `/payments/connection_token`), the Stripe Terminal SDK integration in the
-  app is next.
+- **Tap-to-pay checkout / membership sign-up**: built end-to-end — Stripe
+  Terminal collects the card for both one-off ticket payments and membership
+  card-on-file setup, confirmed against the sandbox backend. Real hardware
+  taps still need the Apple/Android entitlements described below.
 
 ## Requirements
 
