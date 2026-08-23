@@ -72,7 +72,8 @@ export function SignInScreen() {
         {error && <Text className="mb-4 text-center text-sm text-rose-600">{error}</Text>}
 
         <Pressable
-          className="min-h-[44px] items-center justify-center rounded bg-blue-700 py-3 transition-transform duration-150 ease-in-out active:scale-[0.98] disabled:opacity-80"
+          className="min-h-[44px] items-center justify-center rounded bg-blue-700 py-3 transition-transform duration-150 ease-in-out active:scale-[0.98]"
+          style={{ opacity: submitting ? 0.8 : 1 }}
           onPress={handleSignIn}
           disabled={submitting}>
           {submitting ? (

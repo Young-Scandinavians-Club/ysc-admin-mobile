@@ -174,7 +174,8 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
         className="border-t border-zinc-100 bg-white px-6 py-4"
         style={{ paddingBottom: insets.bottom + 16 }}>
         <TouchableOpacity
-          className="min-h-[44px] items-center justify-center rounded bg-blue-700 py-3 transition-transform duration-150 ease-in-out active:scale-[0.98] disabled:opacity-50"
+          className="min-h-[44px] items-center justify-center rounded bg-blue-700 py-3 transition-transform duration-150 ease-in-out active:scale-[0.98]"
+          style={{ opacity: totalCount === 0 ? 0.5 : 1 }}
           disabled={totalCount === 0}
           onPress={() =>
             navigation.navigate('CollectPayment', {
