@@ -114,9 +114,8 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
 
             return (
               <View
-                className={`mb-3 flex-row items-center rounded-xl border border-zinc-100 bg-white p-4 ${
-                  soldOut ? 'opacity-50' : ''
-                }`}>
+                className="mb-3 flex-row items-center rounded-xl border border-zinc-100 bg-white p-4"
+                style={{ opacity: soldOut ? 0.5 : 1 }}>
                 <View className="mr-4 h-11 w-11 items-center justify-center rounded-full bg-blue-50">
                   <Ionicons
                     name={item.type === 'donation' ? 'heart-outline' : 'ticket-outline'}
@@ -175,9 +174,7 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
         className="border-t border-zinc-100 bg-white px-6 py-4"
         style={{ paddingBottom: insets.bottom + 16 }}>
         <TouchableOpacity
-          className={`min-h-[44px] items-center justify-center rounded bg-blue-700 py-3 transition-transform duration-150 ease-in-out active:scale-[0.98] ${
-            totalCount === 0 ? 'opacity-50' : ''
-          }`}
+          className="min-h-[44px] items-center justify-center rounded bg-blue-700 py-3 transition-transform duration-150 ease-in-out active:scale-[0.98] disabled:opacity-50"
           disabled={totalCount === 0}
           onPress={() =>
             navigation.navigate('CollectPayment', {

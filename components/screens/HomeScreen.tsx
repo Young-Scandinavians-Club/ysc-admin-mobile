@@ -27,9 +27,7 @@ function ActionButton({
 }) {
   return (
     <TouchableOpacity
-      className={`min-h-[44px] flex-row items-center rounded-xl border border-zinc-100 bg-white p-4 transition-transform duration-150 ease-in-out active:scale-[0.98] ${
-        disabled ? 'opacity-50' : ''
-      }`}
+      className="min-h-[44px] flex-row items-center rounded-xl border border-zinc-100 bg-white p-4 transition-transform duration-150 ease-in-out active:scale-[0.98] disabled:opacity-50"
       onPress={onPress}
       disabled={disabled}>
       <View className="mr-4 h-11 w-11 items-center justify-center rounded-full bg-blue-50">

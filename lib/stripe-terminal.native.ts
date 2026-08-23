@@ -1,6 +1,10 @@
-import { useStripeTerminal } from '@stripe/stripe-terminal-react-native';
+import {
+  requestNeededAndroidPermissions,
+  useStripeTerminal,
+} from '@stripe/stripe-terminal-react-native';
 import { isDevice } from 'expo-device';
 import { useCallback, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 
 import { api } from '@/api';
 
@@ -46,6 +50,20 @@ export function useTapToPayCollector() {
   }, []);
 
   const ensureConnectedReader = useCallback(async () => {
+    // Android requires an explicit runtime prompt for location (and, on 12+,
+    // Bluetooth) permissions before Terminal can discover a reader — just
+    // declaring them in app.json's manifest isn't enough. iOS handles this
+    // itself via the Info.plist usage description the first time it's
+    // needed, so this is a no-op there.
+    if (Platform.OS === 'android') {
+      const { error: permissionError } = await requestNeededAndroidPermissions();
+      if (permissionError) {
+        throw new Error(
+          'Location permission is required to connect a card reader. Please grant it in Settings.'
+        );
+      }
+    }
+
     // The SDK requires initialize() before any other method — including
     // getConnectionStatus() — so this must run first, not just before connect.
     if (!initialized.current) {
