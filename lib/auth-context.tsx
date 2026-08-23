@@ -2,6 +2,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Linking } from 'react-native';
+import { mutate as mutateGlobalCache } from 'swr';
 
 import {
   ApiClientError,
@@ -40,6 +41,28 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+/**
+ * This app runs on shared devices passed between volunteers at an event, so
+ * cached data (event lists, membership status) must not survive a sign-out —
+ * the next person to sign in should never see a flash of the previous
+ * person's session. `mutate` with a predicate key clears every SWR cache
+ * entry regardless of key shape.
+ */
+function clearSwrCache() {
+  void mutateGlobalCache(() => true, undefined, { revalidate: false });
+}
+
+/**
+ * Set by `AuthProvider` while mounted so a 401 anywhere (e.g. from a SWR
+ * fetch, not just the explicit signIn/exchangeCode calls below) can force a
+ * sign-out back to the login screen — see `lib/swr.ts`'s `onError`.
+ */
+let globalSignOut: (() => void) | null = null;
+
+export function triggerGlobalSignOut(): void {
+  globalSignOut?.();
+}
 
 function extractCodeParam(url: string): string | null {
   const match = url.match(/[?&]code=([^&]+)/);
@@ -146,10 +169,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setUser(null);
     setStatus('signed_out');
+    clearSwrCache();
     await clearStoredSession();
   }, []);
 
+  useEffect(() => {
+    globalSignOut = () => void signOutFn();
+    return () => {
+      globalSignOut = null;
+    };
+  }, [signOutFn]);
+
   const changeEnvironment = useCallback((env: ApiEnvironment) => {
+    // A token/user is only ever valid for the environment it was issued
+    // against — switching backends while "signed in" would otherwise send
+    // an old bearer token to a different server and mix cached data
+    // between environments on this shared device.
+    setToken(null);
+    setUser(null);
+    setStatus('signed_out');
+    clearSwrCache();
+    void clearStoredSession();
     setEnvironment(env);
     setEnvironmentState(env);
   }, []);
