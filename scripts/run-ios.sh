@@ -40,8 +40,9 @@ fi
 
 echo "==> Checking CocoaPods..."
 if ! command -v pod >/dev/null 2>&1; then
-  echo "  CocoaPods not found — installing via gem (you may be prompted for your password)..."
-  sudo gem install cocoapods
+  echo "error: CocoaPods not found." >&2
+  echo "  Install it with: brew install cocoapods" >&2
+  exit 1
 fi
 
 echo "==> Checking node_modules..."
@@ -65,7 +66,7 @@ IPHONE_DEVICE="${IOS_SIMULATOR_DEVICE:-}"
 if [[ -z "$IPHONE_DEVICE" ]]; then
   IPHONE_DEVICE="$(
     xcrun simctl list devices available 2>/dev/null \
-      | grep -E "^\s+iPhone" \
+      | grep -E "^[[:space:]]+iPhone" \
       | sed -E 's/^[[:space:]]+//; s/ \([A-F0-9-]+\).*$//' \
       | head -n1 || true
   )"
@@ -73,7 +74,9 @@ fi
 
 if [[ -z "$IPHONE_DEVICE" ]]; then
   echo "  No iPhone simulator found — creating one..."
-  DEVICETYPE_LINE="$(xcrun simctl list devicetypes 2>/dev/null | grep "iPhone" | head -n1 || true)"
+  # Apple lists device types oldest-to-newest, so the last match is the
+  # newest iPhone model available rather than the oldest.
+  DEVICETYPE_LINE="$(xcrun simctl list devicetypes 2>/dev/null | grep "iPhone" | tail -n1 || true)"
   RUNTIME_ID="$(
     xcrun simctl list runtimes available 2>/dev/null \
       | grep "iOS" \

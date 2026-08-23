@@ -37,4 +37,8 @@ android-device: ## Install & run on a USB-connected physical Android device (nee
 	@API_ENV=$(ENV) DEVICE_ONLY=1 HOST=$(HOST) ./scripts/run-android.sh
 
 web: ## Run the app in a browser via expo start --web. ENV=local|sandbox|prod
+	@case "$(ENV)" in \
+		local|sandbox|prod) ;; \
+		*) echo "error: invalid ENV '$(ENV)' — expected local, sandbox, or prod." >&2; exit 1 ;; \
+	esac
 	@EXPO_PUBLIC_API_ENVIRONMENT=$(ENV) npm run -s web

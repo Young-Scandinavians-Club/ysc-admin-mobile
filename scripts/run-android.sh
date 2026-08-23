@@ -198,12 +198,20 @@ else
   fi
 
   echo "==> Booting emulator: $AVD_NAME (this can take a minute)..."
-  nohup "$EMULATOR" -avd "$AVD_NAME" -netdelay none -netspeed full >/tmp/expo-android-emulator.log 2>&1 &
+  EMULATOR_LOG="$(mktemp -t expo-android-emulator.XXXXXX.log)"
+  echo "  Emulator log: $EMULATOR_LOG"
+  nohup "$EMULATOR" -avd "$AVD_NAME" -netdelay none -netspeed full >"$EMULATOR_LOG" 2>&1 &
   disown
 
   echo "==> Waiting for emulator to finish booting..."
   "$ADB" wait-for-device
+  BOOT_DEADLINE=$(($(date +%s) + 180))
   until "$ADB" shell getprop sys.boot_completed 2>/dev/null | grep -q "1"; do
+    if [[ "$(date +%s)" -ge "$BOOT_DEADLINE" ]]; then
+      echo "error: emulator didn't finish booting within 180s." >&2
+      echo "  Check the emulator log: $EMULATOR_LOG" >&2
+      exit 1
+    fi
     sleep 2
   done
   echo "  Emulator ready."
