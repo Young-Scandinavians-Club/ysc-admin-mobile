@@ -34,6 +34,13 @@ export interface RequestOptions<TBody = unknown> {
 }
 
 /**
+ * A stalled/unreachable backend (weak venue Wi-Fi, VPN drop, etc.) must not
+ * hang a screen forever on a shared device — better to surface a clear
+ * "couldn't reach the server" error the volunteer can retry.
+ */
+const REQUEST_TIMEOUT_MS = 15000;
+
+/**
  * Low-level request: adds Authorization (Bearer <token>) when signed in, Accept,
  * optional JSON body. Throws ApiClientError on non-2xx with status and parsed
  * error when JSON. A 401 means the token is missing/expired/revoked — callers
@@ -65,9 +72,26 @@ export async function request<TResponse, TBody = unknown>(
     bodyStr = JSON.stringify(body);
   }
 
-  const init: RequestInit = { method, headers };
+  // RN's AbortController/AbortSignal polyfill (`abort-controller` npm package,
+  // wired up in setUpXHR.js) predates AbortSignal.timeout() and doesn't
+  // implement it, so the timeout has to be built by hand.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  const init: RequestInit = { method, headers, signal: controller.signal };
   if (bodyStr !== undefined) init.body = bodyStr;
-  const res = await fetch(url.toString(), init);
+
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), init);
+  } catch {
+    if (controller.signal.aborted) {
+      throw new ApiClientError('The server took too long to respond. Please try again.', 0);
+    }
+    throw new ApiClientError('Unable to reach the server. Check your connection and try again.', 0);
+  } finally {
+    clearTimeout(timer);
+  }
 
   const text = await res.text();
 
