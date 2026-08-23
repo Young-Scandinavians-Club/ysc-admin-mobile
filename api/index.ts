@@ -1,13 +1,20 @@
 import { getApiConfig } from './config';
 import {
+  createMembershipSetupIntent as _createMembershipSetupIntent,
   createTerminalConnectionToken as _createTerminalConnectionToken,
   createTicketPaymentIntent as _createTicketPaymentIntent,
   eventsList as _eventsList,
   membershipPlans as _membershipPlans,
+  searchMembers as _searchMembers,
   signOut as _signOut,
   subscribeMembership as _subscribeMembership,
 } from './endpoints';
-import type { EventsListParams, SubscribeRequest, TicketPaymentIntentRequest } from './types';
+import type {
+  EventsListParams,
+  MembershipSetupIntentRequest,
+  SubscribeRequest,
+  TicketPaymentIntentRequest,
+} from './types';
 
 export { request, ApiClientError } from './client';
 export type { RequestOptions } from './client';
@@ -36,9 +43,12 @@ export const api = {
   eventsList: (params: EventsListParams = {}) => _eventsList(getApiConfig(), params),
   membershipPlans: () => _membershipPlans(getApiConfig()),
   subscribeMembership: (body: SubscribeRequest) => _subscribeMembership(getApiConfig(), body),
+  createMembershipSetupIntent: (body: MembershipSetupIntentRequest) =>
+    _createMembershipSetupIntent(getApiConfig(), body),
   createTerminalConnectionToken: () => _createTerminalConnectionToken(getApiConfig()),
   createTicketPaymentIntent: (ticketTierId: string, body: TicketPaymentIntentRequest) =>
     _createTicketPaymentIntent(getApiConfig(), ticketTierId, body),
+  searchMembers: (query: string) => _searchMembers(getApiConfig(), query),
   signOut: () => _signOut(getApiConfig()),
 };
 
@@ -56,8 +66,12 @@ export type {
   EventsMeta,
   EventsResponse,
   EventTicketTier,
+  Member,
   MembershipPlan,
   MembershipPlansResponse,
+  MembershipSetupIntentRequest,
+  MembershipSetupIntentResponse,
+  MembersSearchResponse,
   PasswordSessionResponse,
   SubscribeRequest,
   SubscribeResponse,

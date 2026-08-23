@@ -10,6 +10,12 @@ import { swrConfig } from '@/lib/swr';
 
 import './global.css';
 
+/**
+ * The Stripe Terminal SDK has no web implementation (native-only module) and
+ * even importing it breaks Metro's web bundle, so this web build (used only
+ * for previewing everything else during development) never references it —
+ * see App.native.tsx for the real, Terminal-enabled app.
+ */
 function AppContent() {
   const { status } = useAuth();
 

@@ -136,12 +136,37 @@ export interface SubscribeResponse {
   status: string;
 }
 
+export interface MembershipSetupIntentRequest {
+  member_id: string;
+}
+
+export interface MembershipSetupIntentResponse {
+  client_secret: string;
+}
+
+// =============================================================================
+// GET /members/search
+// =============================================================================
+
+export interface Member {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string;
+  has_active_membership: boolean;
+}
+
+export interface MembersSearchResponse {
+  data: readonly Member[];
+}
+
 // =============================================================================
 // POST /payments/connection_token — Stripe Terminal SDK initialization
 // =============================================================================
 
 export interface ConnectionTokenResponse {
   secret: string;
+  location_id: string;
 }
 
 // =============================================================================

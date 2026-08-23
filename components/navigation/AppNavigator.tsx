@@ -3,7 +3,11 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from './types';
 
-import { EventsScreen } from '@/components/screens/EventsScreen';
+import { CollectPaymentScreen } from '@/components/screens/CollectPaymentScreen';
+import { EventTicketTiersScreen } from '@/components/screens/EventTicketTiersScreen';
+import { HomeScreen } from '@/components/screens/HomeScreen';
+import { MemberSearchScreen } from '@/components/screens/MemberSearchScreen';
+import { MembershipPlansScreen } from '@/components/screens/MembershipPlansScreen';
 import { SignInScreen } from '@/components/screens/SignInScreen';
 import { useAuth } from '@/lib/auth-context';
 
@@ -27,7 +31,13 @@ export function AppNavigator() {
           contentStyle: { backgroundColor: '#fafafa' },
         }}>
         {status === 'signed_in' ? (
-          <Stack.Screen name="Events" component={EventsScreen} />
+          <>
+            <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="MemberSearch" component={MemberSearchScreen} />
+            <Stack.Screen name="MembershipPlans" component={MembershipPlansScreen} />
+            <Stack.Screen name="EventTicketTiers" component={EventTicketTiersScreen} />
+            <Stack.Screen name="CollectPayment" component={CollectPaymentScreen} />
+          </>
         ) : (
           <Stack.Screen name="SignIn" component={SignInScreen} />
         )}

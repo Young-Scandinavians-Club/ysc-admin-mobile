@@ -6,6 +6,7 @@
     "exactOptionalPropertyTypes": true,
     "noImplicitOverride": true,
     "types": ["jest", "node"],
+    "moduleSuffixes": [".native", ""],
     "paths": {
       "@/*": ["./*"]
     }

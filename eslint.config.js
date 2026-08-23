@@ -28,6 +28,42 @@ module.exports = defineConfig([
     },
   },
   {
+    // Platform-specific modules (App.native.tsx / App.web.tsx,
+    // lib/stripe-terminal.native.ts / .web.ts) are only resolvable by
+    // extension-suffix search — the default resolver extension list doesn't
+    // include the platform suffixes, so this reproduces it with them added.
+    settings: {
+      'import/resolver': {
+        node: {
+          extensions: [
+            '.native.ts',
+            '.native.tsx',
+            '.web.ts',
+            '.web.tsx',
+            '.ts',
+            '.tsx',
+            '.js',
+            '.jsx',
+            '.json',
+          ],
+        },
+        typescript: {
+          extensions: [
+            '.native.ts',
+            '.native.tsx',
+            '.web.ts',
+            '.web.tsx',
+            '.ts',
+            '.tsx',
+            '.js',
+            '.jsx',
+            '.json',
+          ],
+        },
+      },
+    },
+  },
+  {
     files: ['**/*.{ts,tsx}'],
     plugins: {
       'unused-imports': unusedImports,

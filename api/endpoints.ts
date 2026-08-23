@@ -5,6 +5,9 @@ import type {
   EventsListParams,
   EventsResponse,
   MembershipPlansResponse,
+  MembershipSetupIntentRequest,
+  MembershipSetupIntentResponse,
+  MembersSearchResponse,
   PasswordSessionResponse,
   SubscribeRequest,
   SubscribeResponse,
@@ -58,6 +61,25 @@ export function subscribeMembership(
   body: SubscribeRequest
 ): Promise<SubscribeResponse> {
   return request<SubscribeResponse>(config, '/api/v1/app/memberships/subscribe', {
+    method: 'POST',
+    body,
+  });
+}
+
+export function searchMembers(
+  config: ApiClientConfig,
+  query: string
+): Promise<MembersSearchResponse> {
+  return request<MembersSearchResponse>(config, '/api/v1/app/members/search', {
+    searchParams: { q: query },
+  });
+}
+
+export function createMembershipSetupIntent(
+  config: ApiClientConfig,
+  body: MembershipSetupIntentRequest
+): Promise<MembershipSetupIntentResponse> {
+  return request<MembershipSetupIntentResponse>(config, '/api/v1/app/memberships/setup_intent', {
     method: 'POST',
     body,
   });
