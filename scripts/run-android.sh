@@ -96,33 +96,45 @@ DEVICE_ONLY="${DEVICE_ONLY:-}"
 
 if [[ -n "$DEVICE_ONLY" ]]; then
   echo "==> Checking for a connected physical device (DEVICE_ONLY=1, no emulator fallback)..."
-  PHYSICAL_SERIALS=()
-  while IFS=$'\t' read -r serial state _rest; do
-    [[ "$state" == "device" ]] || continue
-    [[ "$serial" == emulator-* ]] && continue
-    PHYSICAL_SERIALS+=("$serial")
-  done < <("$ADB" devices | tail -n +2)
 
-  if [[ ${#PHYSICAL_SERIALS[@]} -eq 0 ]]; then
-    echo "error: no physical Android device found via adb." >&2
-    echo "  1. Connect your phone via USB." >&2
-    echo "  2. Enable USB debugging: Settings > About phone > tap 'Build number' 7x to" >&2
-    echo "     unlock Developer options, then Settings > Developer options > USB debugging." >&2
-    echo "  3. Accept the \"Allow USB debugging?\" prompt that appears on the phone." >&2
-    echo "  Verify with: adb devices — it should list your device as \"device\", not" >&2
-    echo "  \"unauthorized\" (re-accept the prompt) or missing entirely (try a different" >&2
-    echo "  USB cable/port, or run 'adb kill-server && adb start-server')." >&2
-    exit 1
+  if [[ -n "${ANDROID_SERIAL:-}" ]]; then
+    echo "  Using ANDROID_SERIAL from the environment: $ANDROID_SERIAL"
+  else
+    PHYSICAL_SERIALS=()
+    while IFS=$'\t' read -r serial state _rest; do
+      [[ "$state" == "device" ]] || continue
+      [[ "$serial" == emulator-* ]] && continue
+      PHYSICAL_SERIALS+=("$serial")
+    done < <("$ADB" devices | tail -n +2)
+
+    if [[ ${#PHYSICAL_SERIALS[@]} -eq 0 ]]; then
+      echo "error: no physical Android device found via adb." >&2
+      echo "  1. Connect your phone via USB (or pair over Wi-Fi: adb pair <ip>:<port>)." >&2
+      echo "  2. Enable USB debugging: Settings > About phone > tap 'Build number' 7x to" >&2
+      echo "     unlock Developer options, then Settings > Developer options > USB debugging." >&2
+      echo "  3. Accept the \"Allow USB debugging?\" prompt that appears on the phone." >&2
+      echo "  Verify with: adb devices — it should list your device as \"device\", not" >&2
+      echo "  \"unauthorized\" (re-accept the prompt) or missing entirely (try a different" >&2
+      echo "  USB cable/port, or run 'adb kill-server && adb start-server')." >&2
+      exit 1
+    fi
+
+    if [[ ${#PHYSICAL_SERIALS[@]} -gt 1 ]]; then
+      echo "error: multiple physical devices connected — set ANDROID_SERIAL to pick one:" >&2
+      printf '  %s\n' "${PHYSICAL_SERIALS[@]}" >&2
+      exit 1
+    fi
+
+    export ANDROID_SERIAL="${PHYSICAL_SERIALS[0]}"
+    echo "  Using connected device: $ANDROID_SERIAL"
   fi
 
-  if [[ ${#PHYSICAL_SERIALS[@]} -gt 1 ]]; then
-    echo "error: multiple physical devices connected — set ANDROID_SERIAL to pick one:" >&2
-    printf '  %s\n' "${PHYSICAL_SERIALS[@]}" >&2
-    exit 1
-  fi
-
-  echo "  Using connected device: ${PHYSICAL_SERIALS[0]}"
-  DEVICE_ARG=(--device "${PHYSICAL_SERIALS[0]}")
+  # Deliberately not `--device <serial>`: Expo's CLI does its own device-name
+  # lookup for that flag, which doesn't recognize wireless-ADB serials (e.g.
+  # "adb-XXXX._adb-tls-connect._tcp" from `adb pair`) even though `adb` itself
+  # sees them fine. Exporting ANDROID_SERIAL instead makes every adb/gradle
+  # call underneath target it directly, the same way it already works when
+  # exactly one device is connected and no --device is passed at all below.
 elif "$ADB" devices | grep -qE "(device|emulator-[0-9]+)$"; then
   echo "==> Checking for a connected device or running emulator..."
   echo "  A device/emulator is already connected."
