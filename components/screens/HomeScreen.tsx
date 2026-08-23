@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import useSWR from 'swr';
 
@@ -26,7 +26,7 @@ function ActionButton({
   disabled?: boolean;
 }) {
   return (
-    <TouchableOpacity
+    <Pressable
       className="min-h-[44px] flex-row items-center rounded-xl border border-zinc-100 bg-white p-4 transition-transform duration-150 ease-in-out active:scale-[0.98]"
       style={{ opacity: disabled ? 0.5 : 1 }}
       onPress={onPress}
@@ -39,7 +39,7 @@ function ActionButton({
         <Text className="mt-0.5 text-xs text-zinc-500">{subtitle}</Text>
       </View>
       {!disabled && <Ionicons name="chevron-forward" size={18} color="#a1a1aa" />}
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 

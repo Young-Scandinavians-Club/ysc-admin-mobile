@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import useSWR from 'swr';
 
@@ -173,7 +173,7 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
       <View
         className="border-t border-zinc-100 bg-white px-6 py-4"
         style={{ paddingBottom: insets.bottom + 16 }}>
-        <TouchableOpacity
+        <Pressable
           className="min-h-[44px] items-center justify-center rounded bg-blue-700 py-3 transition-transform duration-150 ease-in-out active:scale-[0.98]"
           style={{ opacity: totalCount === 0 ? 0.5 : 1 }}
           disabled={totalCount === 0}
@@ -193,7 +193,7 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
               ? 'Select at least one ticket'
               : `Continue — ${totalLabelFor(selectedItems)}`}
           </Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
     </View>
   );
