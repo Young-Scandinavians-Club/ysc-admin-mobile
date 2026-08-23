@@ -1,7 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 import { api, ApiClientError } from '@/api';
 import type { Member } from '@/api/types';
@@ -52,6 +60,22 @@ export function MemberSearchScreen({ navigation, route }: Props) {
         navigation.navigate('MembershipPlans', { memberId: member.id, memberName: name });
       }
     } else {
+      if (!member.has_active_membership) {
+        Alert.alert(
+          'No active membership',
+          `${name} does not have an active membership. An active membership is required to purchase event tickets.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Set up membership',
+              onPress: () =>
+                navigation.navigate('MembershipPlans', { memberId: member.id, memberName: name }),
+            },
+          ]
+        );
+        return;
+      }
+
       navigation.navigate('EventTicketQuantities', {
         eventId: params.eventId,
         eventTitle: params.eventTitle,
