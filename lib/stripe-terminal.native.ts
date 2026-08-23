@@ -170,7 +170,16 @@ export function useTapToPayCollector() {
         });
         if (confirmed.error) throw new Error(confirmed.error.message);
 
-        const paymentMethodId = confirmed.setupIntent.paymentMethodId;
+        // For a card_present SetupIntent, `setupIntent.paymentMethodId` is the
+        // original, single-use card-present PaymentMethod — Stripe attaches a
+        // *different*, reusable PaymentMethod (the "generated card") to the
+        // customer instead, exposed here via latestAttempt. Using the former
+        // (rather than this one) as the subscription's default_payment_method
+        // fails, since it was never attached to the customer. See
+        // https://docs.stripe.com/api/setup_intents/object#setup_intent_object-payment_method
+        const paymentMethodId =
+          confirmed.setupIntent.latestAttempt?.paymentMethodDetails?.cardPresent?.generatedCard ??
+          confirmed.setupIntent.paymentMethodId;
         if (!paymentMethodId) throw new Error('Card was not saved. Please try again.');
 
         setStep('success');
