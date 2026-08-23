@@ -133,27 +133,27 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
                 {!soldOut && (
                   <View className="flex-row items-center">
                     <TouchableOpacity
-                      className="h-12 w-12 items-center justify-center"
+                      className="h-16 w-16 items-center justify-center"
                       disabled={quantity === 0}
                       onPress={() => adjust(item, -1)}
                       accessibilityLabel={`Decrease ${item.name} quantity`}>
                       <Ionicons
                         name="remove-circle-outline"
-                        size={34}
+                        size={44}
                         color={quantity === 0 ? '#d4d4d8' : '#144993'}
                       />
                     </TouchableOpacity>
-                    <Text className="w-9 text-center text-lg font-semibold text-zinc-900">
+                    <Text className="w-10 text-center text-xl font-semibold text-zinc-900">
                       {quantity}
                     </Text>
                     <TouchableOpacity
-                      className="h-12 w-12 items-center justify-center"
+                      className="h-16 w-16 items-center justify-center"
                       disabled={atMax}
                       onPress={() => adjust(item, 1)}
                       accessibilityLabel={`Increase ${item.name} quantity`}>
                       <Ionicons
                         name="add-circle-outline"
-                        size={34}
+                        size={44}
                         color={atMax ? '#d4d4d8' : '#144993'}
                       />
                     </TouchableOpacity>
