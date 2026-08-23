@@ -1,6 +1,7 @@
 import * as WebBrowser from 'expo-web-browser';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import { Linking } from 'react-native';
 
 import {
   ApiClientError,
@@ -78,17 +79,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       MOBILE_REDIRECT_URI
     )}`;
 
-    let result;
+    // On some Android/Chrome combinations, openAuthSessionAsync's own promise
+    // never resolves even though the OS *did* hand the redirect back to this
+    // app (a documented Custom Tabs flakiness — see
+    // https://github.com/expo/expo/issues/27500). Racing a plain Linking
+    // listener alongside it catches that case: whichever fires first wins,
+    // and we dismiss the lingering browser tab ourselves either way.
+    let redirectUrl: string | null;
     try {
-      result = await WebBrowser.openAuthSessionAsync(loginUrl, MOBILE_REDIRECT_URI);
+      redirectUrl = await new Promise<string | null>((resolve, reject) => {
+        let settled = false;
+
+        const subscription = Linking.addEventListener('url', ({ url }) => {
+          if (settled || !url.startsWith(MOBILE_REDIRECT_URI)) return;
+          settled = true;
+          subscription.remove();
+          void WebBrowser.dismissBrowser();
+          resolve(url);
+        });
+
+        WebBrowser.openAuthSessionAsync(loginUrl, MOBILE_REDIRECT_URI)
+          .then((result) => {
+            if (settled) return;
+            settled = true;
+            subscription.remove();
+            resolve(result.type === 'success' ? result.url : null);
+          })
+          .catch((err: unknown) => {
+            if (settled) return;
+            settled = true;
+            subscription.remove();
+            reject(err);
+          });
+      });
     } catch {
       throw new Error('Unable to reach the server. Check your connection and try again.');
     }
 
     // User closed the browser tab without completing login — not an error.
-    if (result.type !== 'success') return;
+    if (!redirectUrl) return;
 
-    const code = extractCodeParam(result.url);
+    const code = extractCodeParam(redirectUrl);
     if (!code) {
       throw new Error('Sign-in did not complete. Please try again.');
     }
