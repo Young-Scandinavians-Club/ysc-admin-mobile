@@ -5,6 +5,7 @@ import useSWR from 'swr';
 
 import { api } from '@/api';
 import type { Event } from '@/api/types';
+import { Avatar } from '@/components/Avatar';
 import type { RootStackParamList } from '@/components/navigation/types';
 import { useAuth } from '@/lib/auth-context';
 
@@ -70,11 +71,14 @@ export function HomeScreen({ navigation }: Props) {
   return (
     <View className="flex-1 bg-zinc-50">
       <View className="flex-row items-center justify-between border-b border-zinc-100 bg-white px-6 py-4">
-        <View>
-          <Text className="text-lg font-semibold text-blue-900">Take a payment</Text>
-          <Text className="text-xs text-zinc-500">
-            Signed in as {user?.first_name} ({user?.role})
-          </Text>
+        <View className="flex-row items-center">
+          {user && <Avatar uri={user.avatar_url} size={36} />}
+          <View className="ml-3">
+            <Text className="text-lg font-semibold text-blue-900">Take a payment</Text>
+            <Text className="text-xs text-zinc-500">
+              Signed in as {user?.first_name} ({user?.role})
+            </Text>
+          </View>
         </View>
         <TouchableOpacity className="min-h-[44px] justify-center" onPress={() => void signOut()}>
           <Text className="text-sm font-medium text-red-700">Sign out</Text>

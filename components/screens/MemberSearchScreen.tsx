@@ -13,6 +13,7 @@ import {
 
 import { api, ApiClientError } from '@/api';
 import type { Member } from '@/api/types';
+import { Avatar } from '@/components/Avatar';
 import type { RootStackParamList } from '@/components/navigation/types';
 import { ScreenHeader } from '@/components/screens/ScreenHeader';
 
@@ -128,8 +129,8 @@ export function MemberSearchScreen({ navigation, route }: Props) {
             <TouchableOpacity
               className="mb-3 flex-row items-center rounded-xl border border-zinc-100 bg-white p-4 transition-transform duration-150 ease-in-out active:scale-[0.98]"
               onPress={() => selectMember(item)}>
-              <View className="mr-4 h-11 w-11 items-center justify-center rounded-full bg-blue-50">
-                <Ionicons name="person-outline" size={20} color="#144993" />
+              <View className="mr-4">
+                <Avatar uri={item.avatar_url} size={44} />
               </View>
               <View className="flex-1">
                 <Text className="text-base font-semibold text-zinc-900">{memberName(item)}</Text>

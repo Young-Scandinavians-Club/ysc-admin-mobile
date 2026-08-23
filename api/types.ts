@@ -21,6 +21,8 @@ export interface AppUser {
   first_name: string | null;
   last_name: string | null;
   role: UserRole;
+  /** Always a usable image URL — the backend falls back to a default when none is uploaded. */
+  avatar_url: string;
 }
 
 export interface PasswordSessionResponse {
@@ -168,6 +170,8 @@ export interface Member {
   last_name: string | null;
   email: string;
   has_active_membership: boolean;
+  /** Always a usable image URL — the backend falls back to a default when none is uploaded. */
+  avatar_url: string;
 }
 
 export interface MembersSearchResponse {
