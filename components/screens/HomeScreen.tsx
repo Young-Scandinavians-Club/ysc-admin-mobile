@@ -43,10 +43,12 @@ function ActionButton({
   );
 }
 
-function EventRow({ event, onPress }: { event: Event; onPress: () => void }) {
+function EventRow({ event, onPress }: { event: Event; onPress?: (() => void) | undefined }) {
   return (
     <TouchableOpacity
       className="mb-3 flex-row items-center rounded-xl border border-zinc-100 bg-white p-4 transition-transform duration-150 ease-in-out active:scale-[0.98]"
+      style={{ opacity: onPress ? 1 : 0.5 }}
+      disabled={!onPress}
       onPress={onPress}>
       <View className="mr-4 h-11 w-11 items-center justify-center rounded-full bg-blue-50">
         <Ionicons name="calendar-outline" size={20} color="#144993" />
@@ -102,12 +104,18 @@ export function HomeScreen({ navigation }: Props) {
         renderItem={({ item }) => (
           <EventRow
             event={item}
-            onPress={() =>
-              navigation.navigate('MemberSearch', {
-                purpose: 'ticket',
-                eventId: item.id ?? '',
-                eventTitle: item.title,
-              })
+            // item.id can be missing on malformed data — silently building an
+            // empty eventId would navigate into a dead-end "no ticket tiers"
+            // screen instead of clearly doing nothing.
+            onPress={
+              item.id
+                ? () =>
+                    navigation.navigate('MemberSearch', {
+                      purpose: 'ticket',
+                      eventId: item.id ?? '',
+                      eventTitle: item.title,
+                    })
+                : undefined
             }
           />
         )}
