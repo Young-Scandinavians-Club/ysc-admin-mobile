@@ -3,9 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { type ApiEnvironment, isValidEnvironment } from '@/api/config';
 import type { AppUser } from '@/api/types';
 
-const KEY_TOKEN = 'ysc_admin_token';
-const KEY_ENVIRONMENT = 'ysc_admin_environment';
-const KEY_USER = 'ysc_admin_user';
+const KEY_SESSION = 'ysc_admin_session';
 
 export interface StoredSession {
   token: string;
@@ -16,29 +14,27 @@ export interface StoredSession {
 /** Load the signed-in session from secure storage. Returns null if not set or on error (e.g. web). */
 export async function loadStoredSession(): Promise<StoredSession | null> {
   try {
-    const [token, environment, userJson] = await Promise.all([
-      SecureStore.getItemAsync(KEY_TOKEN),
-      SecureStore.getItemAsync(KEY_ENVIRONMENT),
-      SecureStore.getItemAsync(KEY_USER),
-    ]);
-    if (!token || !environment || !userJson) return null;
-    if (!isValidEnvironment(environment)) return null;
+    const sessionJson = await SecureStore.getItemAsync(KEY_SESSION);
+    if (!sessionJson) return null;
 
-    const user = JSON.parse(userJson) as AppUser;
-    return { token, environment, user };
+    const session = JSON.parse(sessionJson) as StoredSession;
+    if (!session.token || !session.user || !isValidEnvironment(session.environment)) return null;
+
+    return session;
   } catch {
     return null;
   }
 }
 
-/** Save the signed-in session to secure storage. */
+/**
+ * Save the signed-in session to secure storage as a single value — token,
+ * environment, and user must always change together. Splitting them across
+ * separate keys risked a partial write pairing a new token with a stale
+ * user/environment (e.g. after a crash mid-write).
+ */
 export async function saveStoredSession(session: StoredSession): Promise<void> {
   try {
-    await Promise.all([
-      SecureStore.setItemAsync(KEY_TOKEN, session.token),
-      SecureStore.setItemAsync(KEY_ENVIRONMENT, session.environment),
-      SecureStore.setItemAsync(KEY_USER, JSON.stringify(session.user)),
-    ]);
+    await SecureStore.setItemAsync(KEY_SESSION, JSON.stringify(session));
   } catch {
     // e.g. SecureStore not available on web
   }
@@ -47,11 +43,7 @@ export async function saveStoredSession(session: StoredSession): Promise<void> {
 /** Remove the stored session from secure storage (sign-out). */
 export async function clearStoredSession(): Promise<void> {
   try {
-    await Promise.all([
-      SecureStore.deleteItemAsync(KEY_TOKEN),
-      SecureStore.deleteItemAsync(KEY_ENVIRONMENT),
-      SecureStore.deleteItemAsync(KEY_USER),
-    ]);
+    await SecureStore.deleteItemAsync(KEY_SESSION);
   } catch {
     // no-op
   }
