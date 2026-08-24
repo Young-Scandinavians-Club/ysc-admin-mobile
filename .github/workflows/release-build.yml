@@ -1,0 +1,41 @@
+name: Release build
+
+# Pushing a release tag (e.g. `v1.2.0`) to any branch — in practice always
+# cut from `main` — builds internal-distribution iOS/Android binaries against
+# the prod backend (see eas.json's `production` profile) so the team can
+# install them without an app store.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ios, android]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build ${{ matrix.platform }} (production profile, internal distribution)
+        run: |
+          eas build \
+            --platform ${{ matrix.platform }} \
+            --profile production \
+            --non-interactive \
+            --message "${{ github.ref_name }}"
