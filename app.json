@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "YSC Admin",
+    "slug": "ysc_admin_app",
+    "version": "1.0.0",
+    "scheme": "ysc-admin",
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "experiments": {
+      "tsconfigPaths": true
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-status-bar",
+      "expo-dev-client",
+      [
+        "@stripe/stripe-terminal-react-native",
+        {
+          "appDelegate": true,
+          "tapToPayCheck": true,
+          "locationWhenInUsePermission": "YSC Admin uses your location to connect to Stripe Tap to Pay and to card readers.",
+          "bluetoothPeripheralPermission": "YSC Admin uses Bluetooth to connect to supported card readers.",
+          "bluetoothAlwaysUsagePermission": "YSC Admin uses Bluetooth to connect to supported card readers.",
+          "localNetworkUsagePermission": "YSC Admin uses the local network to connect to supported card readers."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ]
+    ],
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "org.ysc.admin"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "org.ysc.admin"
+    }
+  }
+}
