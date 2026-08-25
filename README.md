@@ -93,6 +93,32 @@ make typecheck    # tsc --noEmit
 make test        # jest
 ```
 
+## Releases
+
+This app isn't on the App Store / Play Store — it's distributed straight to
+the team as installable builds via EAS's **internal distribution**.
+
+Push a version tag to trigger one: `git tag v1.2.0 && git push origin v1.2.0`
+(from `main`). The [`release-build`](.github/workflows/release-build.yml)
+workflow then builds both platforms with the `production` `eas.json` profile
+(`prod` backend, internal distribution) and prints each build's install page
+in the Actions log.
+
+One-time setup:
+
+- **`EXPO_TOKEN` repo secret**: an [Expo access
+  token](https://expo.dev/accounts/[account]/settings/access-tokens) with
+  permission to build this project, added under repo Settings → Secrets and
+  variables → Actions.
+- **iOS device registration**: internal-distribution iOS builds are ad hoc —
+  each teammate's device UDID must be registered once before it can install
+  a build: `eas device:create` (adds it to the project's ad hoc provisioning
+  profile; the next iOS build picks it up). Android has no such step — the
+  `.apk` install link just works.
+
+Team members install straight from the build's EAS page (QR code or link);
+no TestFlight/Play internal-testing enrollment needed.
+
 ## Design system
 
 UI styling follows `ysc.org`'s `STYLE_GUIDE.md` and `assets/tailwind.config.js`
