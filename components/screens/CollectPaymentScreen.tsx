@@ -36,6 +36,15 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
   useEffect(() => {
     testCardIdRef.current = testCardId;
   }, [testCardId]);
+  // Membership only: once collectSetup has actually saved a card, a retry
+  // (e.g. subscribeMembership failing after a successful collection) must
+  // not collect the card again — Terminal SetupIntents don't move money, but
+  // re-collecting is still an unnecessary second card tap, and re-running
+  // subscribeMembership from scratch would otherwise recreate the SetupIntent
+  // for no reason. subscribeMembership's own idempotency key (member+plan,
+  // stable across retries) already makes it safe to call again with the
+  // same payment_method_id.
+  const collectedPaymentMethodIdRef = useRef<string | null>(null);
 
   const title = params.kind === 'ticket' ? params.eventTitle : params.planName;
   const amountLabel = params.kind === 'ticket' ? params.totalLabel : params.amountLabel;
@@ -69,19 +78,28 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
         const outcome = await collector.collectPayment(intent.client_secret, testCard.cardNumber);
         if (!outcome.success) throw new Error(outcome.error);
       } else {
-        const setupIntent = await api.createMembershipSetupIntent({ member_id: params.memberId });
+        let paymentMethodId = collectedPaymentMethodIdRef.current;
 
-        const outcome = await collector.collectSetup(
-          setupIntent.client_secret,
-          testCard.cardNumber
-        );
-        if (!outcome.success) throw new Error(outcome.error);
+        if (!paymentMethodId) {
+          const setupIntent = await api.createMembershipSetupIntent({
+            member_id: params.memberId,
+          });
+
+          const outcome = await collector.collectSetup(
+            setupIntent.client_secret,
+            testCard.cardNumber
+          );
+          if (!outcome.success) throw new Error(outcome.error);
+
+          paymentMethodId = outcome.paymentMethodId;
+          collectedPaymentMethodIdRef.current = paymentMethodId;
+        }
 
         setLocalPhase('finalizing');
         await api.subscribeMembership({
           member_id: params.memberId,
           plan: params.planId,
-          payment_method_id: outcome.paymentMethodId,
+          payment_method_id: paymentMethodId,
         });
       }
       setLocalPhase('success');
