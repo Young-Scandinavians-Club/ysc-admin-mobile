@@ -30,11 +30,12 @@ export function signInWithPassword(
 
 export function exchangeCode(
   config: ApiClientConfig,
-  code: string
+  code: string,
+  codeVerifier: string
 ): Promise<PasswordSessionResponse> {
   return request<PasswordSessionResponse>(config, '/api/v1/app/auth/exchange', {
     method: 'POST',
-    body: { code },
+    body: { code, code_verifier: codeVerifier },
     skipAuth: true,
   });
 }

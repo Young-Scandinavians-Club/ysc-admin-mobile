@@ -15,6 +15,7 @@ import {
 } from '@/api';
 import type { AppUser } from '@/api/types';
 import { clearStoredSession, loadStoredSession, saveStoredSession } from '@/lib/authStorage';
+import { generatePkcePair } from '@/lib/pkce';
 
 type AuthStatus = 'loading' | 'signed_out' | 'signed_in';
 
@@ -98,9 +99,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async () => {
     const config = getApiConfig();
-    const loginUrl = `${config.baseUrl}/users/log-in?mobile_redirect_uri=${encodeURIComponent(
-      MOBILE_REDIRECT_URI
-    )}`;
+    const { codeVerifier, codeChallenge } = await generatePkcePair();
+    const loginUrl =
+      `${config.baseUrl}/users/log-in` +
+      `?mobile_redirect_uri=${encodeURIComponent(MOBILE_REDIRECT_URI)}` +
+      `&code_challenge=${codeChallenge}`;
 
     // On some Android/Chrome combinations, openAuthSessionAsync's own promise
     // never resolves even though the OS *did* hand the redirect back to this
@@ -149,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let response;
     try {
-      response = await exchangeCode(config, code);
+      response = await exchangeCode(config, code, codeVerifier);
     } catch (err) {
       if (err instanceof ApiClientError) throw err;
       throw new Error('Unable to reach the server. Check your connection and try again.');
