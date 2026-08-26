@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "YSC Admin",
-    "slug": "ysc_admin_app",
+    "slug": "ysc-admin",
     "owner": "young-scandinavians-club",
     "version": "1.0.0",
     "scheme": "ysc-admin",
