@@ -1,0 +1,40 @@
+name: Sandbox build
+
+# Every push to main (i.e. every merged PR) builds internal-distribution
+# iOS/Android binaries against the sandbox backend (see eas.json's `preview`
+# profile), so the team always has a current build to install and try out.
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ios, android]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build ${{ matrix.platform }} (preview profile, sandbox backend)
+        run: |
+          eas build \
+            --platform ${{ matrix.platform }} \
+            --profile preview \
+            --non-interactive \
+            --message "${{ github.sha }}"
