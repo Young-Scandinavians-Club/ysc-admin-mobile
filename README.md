@@ -96,13 +96,17 @@ make test        # jest
 ## Releases
 
 This app isn't on the App Store / Play Store — it's distributed straight to
-the team as installable builds via EAS's **internal distribution**.
+the team as installable builds via EAS's **internal distribution**. Two
+workflows build both iOS and Android automatically and print each build's
+install page in the Actions log:
 
-Push a version tag to trigger one: `git tag v1.2.0 && git push origin v1.2.0`
-(from `main`). The [`release-build`](.github/workflows/release-build.yml)
-workflow then builds both platforms with the `production` `eas.json` profile
-(`prod` backend, internal distribution) and prints each build's install page
-in the Actions log.
+| Trigger | Workflow | `eas.json` profile | Backend |
+| --- | --- | --- | --- |
+| Every push to `main` (i.e. every merged PR) | [`sandbox-build`](.github/workflows/sandbox-build.yml) | `preview` | sandbox |
+| Pushing a version tag, e.g. `git tag v1.2.0 && git push origin v1.2.0` (from `main`) | [`release-build`](.github/workflows/release-build.yml) | `production` | prod |
+
+So the team always has a current sandbox build to poke at, while a tagged
+release is the deliberate "ship this to prod" build.
 
 One-time setup:
 
