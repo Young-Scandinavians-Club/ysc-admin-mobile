@@ -10,8 +10,12 @@ on:
     branches:
       - main
 
+concurrency:
+  group: sandbox-latest
+  cancel-in-progress: true
+
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -37,12 +41,14 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Build ${{ matrix.platform }} (preview profile, sandbox backend)
+        env:
+          SHA: ${{ github.sha }}
         run: |
           eas build \
             --platform ${{ matrix.platform }} \
             --profile preview \
             --non-interactive \
-            --message "${{ github.sha }}" \
+            --message "$SHA" \
             --json > build.json
 
       - name: Record build link
@@ -62,6 +68,8 @@ jobs:
     name: Publish sandbox-latest release
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -72,13 +80,15 @@ jobs:
       - name: Recreate the rolling "sandbox-latest" release
         env:
           GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
         run: |
-          notes="Sandbox build for ${{ github.sha }}, built $(date -u +'%Y-%m-%d %H:%M UTC').
+          notes="Sandbox build for $SHA, built $(date -u +'%Y-%m-%d %H:%M UTC').
 
           Install links:
 
           $(cat links/*.md)"
-          gh release delete sandbox-latest --repo "${{ github.repository }}" --yes --cleanup-tag || true
-          gh release create sandbox-latest --repo "${{ github.repository }}" \
+          gh release delete sandbox-latest --repo "$REPOSITORY" --yes --cleanup-tag || true
+          gh release create sandbox-latest --repo "$REPOSITORY" \
             --title "Sandbox (latest)" --notes "$notes" --prerelease \
-            --target "${{ github.sha }}"
+            --target "$SHA"
