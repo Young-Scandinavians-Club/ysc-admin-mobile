@@ -3,10 +3,19 @@ name: Sandbox build
 # Every push to main (i.e. every merged PR) builds internal-distribution
 # iOS/Android binaries against the sandbox backend (see eas.json's `preview`
 # profile), so the team always has a current build to install and try out.
+# The finished builds' install links are published to a rolling
+# "sandbox-latest" GitHub Release rather than left in the Actions log.
 on:
   push:
     branches:
       - main
+
+concurrency:
+  group: sandbox-latest
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -32,9 +41,54 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Build ${{ matrix.platform }} (preview profile, sandbox backend)
+        env:
+          SHA: ${{ github.sha }}
         run: |
           eas build \
             --platform ${{ matrix.platform }} \
             --profile preview \
             --non-interactive \
-            --message "${{ github.sha }}"
+            --message "$SHA" \
+            --json > build.json
+
+      - name: Record build link
+        run: |
+          id=$(jq -r '.[0].id' build.json)
+          owner=$(jq -r '.expo.owner' app.json)
+          slug=$(jq -r '.expo.slug' app.json)
+          echo "- **${{ matrix.platform }}**: https://expo.dev/accounts/$owner/projects/$slug/builds/$id" \
+            > link-${{ matrix.platform }}.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-link-${{ matrix.platform }}
+          path: link-${{ matrix.platform }}.md
+
+  publish:
+    name: Publish sandbox-latest release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: build-link-*
+          path: links
+          merge-multiple: true
+
+      - name: Recreate the rolling "sandbox-latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          notes="Sandbox build for $SHA, built $(date -u +'%Y-%m-%d %H:%M UTC').
+
+          Install links:
+
+          $(cat links/*.md)"
+          gh release delete sandbox-latest --repo "$REPOSITORY" --yes --cleanup-tag || true
+          gh release create sandbox-latest --repo "$REPOSITORY" \
+            --title "Sandbox (latest)" --notes "$notes" --prerelease \
+            --target "$SHA"
