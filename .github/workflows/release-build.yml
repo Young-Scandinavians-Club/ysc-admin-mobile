@@ -3,11 +3,15 @@ name: Release build
 # Pushing a release tag (e.g. `v1.2.0`) to any branch — in practice always
 # cut from `main` — builds internal-distribution iOS/Android binaries against
 # the prod backend (see eas.json's `production` profile) so the team can
-# install them without an app store.
+# install them without an app store. The finished builds' install links are
+# published to the tag's GitHub Release rather than left in the Actions log.
 on:
   push:
     tags:
       - "v*.*.*"
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -38,4 +42,43 @@ jobs:
             --platform ${{ matrix.platform }} \
             --profile production \
             --non-interactive \
-            --message "${{ github.ref_name }}"
+            --message "${{ github.ref_name }}" \
+            --json > build.json
+
+      - name: Record build link
+        run: |
+          id=$(jq -r '.[0].id' build.json)
+          owner=$(jq -r '.expo.owner' app.json)
+          slug=$(jq -r '.expo.slug' app.json)
+          echo "- **${{ matrix.platform }}**: https://expo.dev/accounts/$owner/projects/$slug/builds/$id" \
+            > link-${{ matrix.platform }}.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-link-${{ matrix.platform }}
+          path: link-${{ matrix.platform }}.md
+
+  publish:
+    name: Publish release notes
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: build-link-*
+          path: links
+          merge-multiple: true
+
+      - name: Create/update the GitHub Release for this tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="Install links:
+
+          $(cat links/*.md)"
+          if gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release edit "${{ github.ref_name }}" --repo "${{ github.repository }}" --notes "$notes"
+          else
+            gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" \
+              --title "${{ github.ref_name }}" --notes "$notes"
+          fi

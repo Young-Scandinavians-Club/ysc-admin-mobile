@@ -3,10 +3,15 @@ name: Sandbox build
 # Every push to main (i.e. every merged PR) builds internal-distribution
 # iOS/Android binaries against the sandbox backend (see eas.json's `preview`
 # profile), so the team always has a current build to install and try out.
+# The finished builds' install links are published to a rolling
+# "sandbox-latest" GitHub Release rather than left in the Actions log.
 on:
   push:
     branches:
       - main
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -37,4 +42,43 @@ jobs:
             --platform ${{ matrix.platform }} \
             --profile preview \
             --non-interactive \
-            --message "${{ github.sha }}"
+            --message "${{ github.sha }}" \
+            --json > build.json
+
+      - name: Record build link
+        run: |
+          id=$(jq -r '.[0].id' build.json)
+          owner=$(jq -r '.expo.owner' app.json)
+          slug=$(jq -r '.expo.slug' app.json)
+          echo "- **${{ matrix.platform }}**: https://expo.dev/accounts/$owner/projects/$slug/builds/$id" \
+            > link-${{ matrix.platform }}.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-link-${{ matrix.platform }}
+          path: link-${{ matrix.platform }}.md
+
+  publish:
+    name: Publish sandbox-latest release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: build-link-*
+          path: links
+          merge-multiple: true
+
+      - name: Recreate the rolling "sandbox-latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="Sandbox build for ${{ github.sha }}, built $(date -u +'%Y-%m-%d %H:%M UTC').
+
+          Install links:
+
+          $(cat links/*.md)"
+          gh release delete sandbox-latest --repo "${{ github.repository }}" --yes --cleanup-tag || true
+          gh release create sandbox-latest --repo "${{ github.repository }}" \
+            --title "Sandbox (latest)" --notes "$notes" --prerelease \
+            --target "${{ github.sha }}"

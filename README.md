@@ -97,16 +97,18 @@ make test        # jest
 
 This app isn't on the App Store / Play Store — it's distributed straight to
 the team as installable builds via EAS's **internal distribution**. Two
-workflows build both iOS and Android automatically and print each build's
-install page in the Actions log:
+workflows build both iOS and Android automatically and publish each build's
+install link to the repo's **Releases** page — no digging through Actions
+logs:
 
-| Trigger | Workflow | `eas.json` profile | Backend |
-| --- | --- | --- | --- |
-| Every push to `main` (i.e. every merged PR) | [`sandbox-build`](.github/workflows/sandbox-build.yml) | `preview` | sandbox |
-| Pushing a version tag, e.g. `git tag v1.2.0 && git push origin v1.2.0` (from `main`) | [`release-build`](.github/workflows/release-build.yml) | `production` | prod |
+| Trigger | Workflow | `eas.json` profile | Backend | Where the links land |
+| --- | --- | --- | --- | --- |
+| Every push to `main` (i.e. every merged PR) | [`sandbox-build`](.github/workflows/sandbox-build.yml) | `preview` | sandbox | the rolling [`sandbox-latest`](../../releases/tag/sandbox-latest) release, recreated on every push |
+| Pushing a version tag, e.g. `git tag v1.2.0 && git push origin v1.2.0` (from `main`) | [`release-build`](.github/workflows/release-build.yml) | `production` | prod | the release for that tag |
 
-So the team always has a current sandbox build to poke at, while a tagged
-release is the deliberate "ship this to prod" build.
+So the team can always bookmark `sandbox-latest` for a current build to poke
+at, while a tagged release is the deliberate "ship this to prod" build with
+its own permanent release page.
 
 One-time setup:
 
