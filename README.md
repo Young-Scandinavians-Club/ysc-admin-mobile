@@ -97,18 +97,21 @@ make test        # jest
 
 This app isn't on the App Store / Play Store — it's distributed straight to
 the team as installable builds via EAS's **internal distribution**. Two
-workflows build both iOS and Android automatically and publish each build's
-install link to the repo's **Releases** page — no digging through Actions
-logs:
+workflows build automatically and publish each build's install link to the
+repo's **Releases** page — no digging through Actions logs:
 
-| Trigger | Workflow | `eas.json` profile | Backend | Where the links land |
-| --- | --- | --- | --- | --- |
-| Every push to `main` (i.e. every merged PR) | [`sandbox-build`](.github/workflows/sandbox-build.yml) | `preview` | sandbox | the rolling [`sandbox-latest`](../../releases/tag/sandbox-latest) release, recreated on every push |
-| Pushing a version tag, e.g. `git tag v1.2.0 && git push origin v1.2.0` (from `main`) | [`release-build`](.github/workflows/release-build.yml) | `production` | prod | the release for that tag |
+| Trigger | Workflow | Platforms | `eas.json` profile | Backend | Where the links land |
+| --- | --- | --- | --- | --- | --- |
+| Every push to `main` (i.e. every merged PR) | [`sandbox-build`](.github/workflows/sandbox-build.yml) | Android only | `preview` | sandbox | the rolling [`sandbox-latest`](../../releases/tag/sandbox-latest) release, recreated on every push |
+| Pushing a version tag, e.g. `git tag v1.2.0 && git push origin v1.2.0` (from `main`) | [`release-build`](.github/workflows/release-build.yml) | iOS + Android | `production` | prod | the release for that tag |
 
-So the team can always bookmark `sandbox-latest` for a current build to poke
-at, while a tagged release is the deliberate "ship this to prod" build with
-its own permanent release page.
+So the team can always bookmark `sandbox-latest` for a current Android build
+to poke at, while a tagged release is the deliberate "ship this to prod"
+build, on both platforms, with its own permanent release page.
+
+`sandbox-build` skips iOS for now — internal-distribution iOS builds need ad
+hoc credentials set up interactively per profile (see below), which hasn't
+been done for `preview`. Add an `ios` step back once that's worth doing.
 
 One-time setup:
 
@@ -116,11 +119,14 @@ One-time setup:
   token](https://expo.dev/accounts/[account]/settings/access-tokens) with
   permission to build this project, added under repo Settings → Secrets and
   variables → Actions.
-- **iOS device registration**: internal-distribution iOS builds are ad hoc —
-  each teammate's device UDID must be registered once before it can install
-  a build: `eas device:create` (adds it to the project's ad hoc provisioning
-  profile; the next iOS build picks it up). Android has no such step — the
-  `.apk` install link just works.
+- **iOS credentials** (production builds only, for now): internal-distribution
+  iOS builds are ad hoc, which needs a distribution certificate + ad hoc
+  provisioning profile set up once, interactively:
+  `eas credentials --platform ios --profile production`. Each teammate's
+  device UDID also needs registering before it can install a build:
+  `eas device:create` (adds it to the ad hoc provisioning profile; the next
+  iOS build picks it up). Android has no such step — the `.apk` install link
+  just works.
 
 Team members install straight from the build's EAS page (QR code or link);
 no TestFlight/Play internal-testing enrollment needed.
