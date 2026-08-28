@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useEffect, useRef } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import useSWR from 'swr';
@@ -9,6 +10,7 @@ import type { Event } from '@/api/types';
 import { Avatar } from '@/components/Avatar';
 import type { RootStackParamList } from '@/components/navigation/types';
 import { useAuth } from '@/lib/auth-context';
+import { useEventMode } from '@/lib/event-mode-context';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -43,7 +45,17 @@ function ActionButton({
   );
 }
 
-function EventRow({ event, onPress }: { event: Event; onPress?: (() => void) | undefined }) {
+function EventRow({
+  event,
+  onPress,
+  pinned = false,
+  onTogglePin,
+}: {
+  event: Event;
+  onPress?: (() => void) | undefined;
+  pinned?: boolean;
+  onTogglePin?: (() => void) | undefined;
+}) {
   return (
     <TouchableOpacity
       className="mb-3 flex-row items-center rounded-xl border border-zinc-100 bg-white p-4 transition-transform duration-150 ease-in-out active:scale-[0.98]"
@@ -59,6 +71,20 @@ function EventRow({ event, onPress }: { event: Event; onPress?: (() => void) | u
           {event.pricing_info?.display_text ?? 'Pricing TBD'}
         </Text>
       </View>
+      {onTogglePin && (
+        <TouchableOpacity
+          className="h-11 w-11 items-center justify-center"
+          onPress={onTogglePin}
+          accessibilityLabel={
+            pinned ? `Exit event mode for ${event.title}` : `Take payments for ${event.title}`
+          }>
+          <Ionicons
+            name={pinned ? 'bookmark' : 'bookmark-outline'}
+            size={20}
+            color={pinned ? '#144993' : '#a1a1aa'}
+          />
+        </TouchableOpacity>
+      )}
       <Ionicons name="chevron-forward" size={18} color="#a1a1aa" />
     </TouchableOpacity>
   );
@@ -66,10 +92,26 @@ function EventRow({ event, onPress }: { event: Event; onPress?: (() => void) | u
 
 export function HomeScreen({ navigation }: Props) {
   const { user, signOut } = useAuth();
+  const { pinnedEvent, pinEvent, unpinEvent } = useEventMode();
   const insets = useSafeAreaInsets();
   const { data, error, isLoading, isValidating, mutate } = useSWR('events', () =>
     api.eventsList({ page_size: 50 })
   );
+
+  // "Event mode": when an event is pinned, the app opens straight into member
+  // search for it instead of this list. Runs once per mount — pressing back to
+  // Home (which stays mounted underneath) then shows the list normally, so the
+  // volunteer can change or exit event mode.
+  const redirectedRef = useRef(false);
+  useEffect(() => {
+    if (redirectedRef.current || !pinnedEvent) return;
+    redirectedRef.current = true;
+    navigation.navigate('MemberSearch', {
+      purpose: 'ticket',
+      eventId: pinnedEvent.id,
+      eventTitle: pinnedEvent.title,
+    });
+  }, [pinnedEvent, navigation]);
 
   return (
     <View className="flex-1 bg-zinc-50">
@@ -90,6 +132,22 @@ export function HomeScreen({ navigation }: Props) {
         </TouchableOpacity>
       </View>
 
+      {pinnedEvent && (
+        <View className="flex-row items-center justify-between border-b border-blue-100 bg-blue-50 px-6 py-3">
+          <View className="flex-1 pr-3">
+            <Text className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+              Event mode
+            </Text>
+            <Text className="text-sm font-medium text-blue-900" numberOfLines={1}>
+              {pinnedEvent.title}
+            </Text>
+          </View>
+          <TouchableOpacity className="min-h-[44px] justify-center" onPress={unpinEvent}>
+            <Text className="text-sm font-medium text-blue-700">Change</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {error && (
         <View className="px-6 py-4">
           <Text className="text-sm text-red-700">
@@ -101,24 +159,45 @@ export function HomeScreen({ navigation }: Props) {
       <FlatList
         data={data?.data ?? []}
         keyExtractor={(item, index) => item.id ?? String(index)}
-        renderItem={({ item }) => (
-          <EventRow
-            event={item}
-            // item.id can be missing on malformed data — silently building an
-            // empty eventId would navigate into a dead-end "no ticket tiers"
-            // screen instead of clearly doing nothing.
-            onPress={
-              item.id
-                ? () =>
-                    navigation.navigate('MemberSearch', {
-                      purpose: 'ticket',
-                      eventId: item.id ?? '',
-                      eventTitle: item.title,
-                    })
-                : undefined
-            }
-          />
-        )}
+        renderItem={({ item }) => {
+          // item.id can be missing on malformed data — silently building an
+          // empty eventId would navigate into a dead-end "no ticket tiers"
+          // screen instead of clearly doing nothing.
+          const eventId = item.id;
+          return (
+            <EventRow
+              event={item}
+              pinned={pinnedEvent?.id === eventId}
+              onPress={
+                eventId
+                  ? () =>
+                      navigation.navigate('MemberSearch', {
+                        purpose: 'ticket',
+                        eventId,
+                        eventTitle: item.title,
+                      })
+                  : undefined
+              }
+              onTogglePin={
+                eventId
+                  ? () => {
+                      if (pinnedEvent?.id === eventId) {
+                        unpinEvent();
+                        return;
+                      }
+                      pinEvent({ id: eventId, title: item.title });
+                      redirectedRef.current = true;
+                      navigation.navigate('MemberSearch', {
+                        purpose: 'ticket',
+                        eventId,
+                        eventTitle: item.title,
+                      });
+                    }
+                  : undefined
+              }
+            />
+          );
+        }}
         contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 32 }}
         refreshControl={
           <RefreshControl refreshing={isValidating} onRefresh={() => void mutate()} />

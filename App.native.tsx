@@ -8,6 +8,7 @@ import { SWRConfig } from 'swr';
 import { api } from '@/api';
 import { AppNavigator } from '@/components/navigation/AppNavigator';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
+import { EventModeProvider } from '@/lib/event-mode-context';
 import { swrConfig } from '@/lib/swr';
 
 import './global.css';
@@ -43,7 +44,9 @@ export default function App() {
         <SafeAreaProvider>
           <SWRConfig value={swrConfig}>
             <AuthProvider>
-              <AppContent />
+              <EventModeProvider>
+                <AppContent />
+              </EventModeProvider>
             </AuthProvider>
           </SWRConfig>
         </SafeAreaProvider>

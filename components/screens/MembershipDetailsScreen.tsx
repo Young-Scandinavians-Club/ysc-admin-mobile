@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import useSWR from 'swr';
 
 import { api } from '@/api';
 import type { RootStackParamList } from '@/components/navigation/types';
+import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenHeader } from '@/components/screens/ScreenHeader';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MembershipDetails'>;
@@ -38,11 +39,10 @@ export function MembershipDetailsScreen({ navigation, route }: Props) {
               ? error.message
               : "This member's active membership couldn't be confirmed. You can start a new sign-up instead."}
           </Text>
-          <TouchableOpacity
-            className="min-h-[44px] items-center justify-center rounded bg-blue-700 px-8 py-3 transition-transform duration-150 ease-in-out active:scale-[0.98]"
-            onPress={() => navigation.replace('MembershipPlans', { memberId, memberName })}>
-            <Text className="text-base font-semibold text-zinc-100">Choose a plan</Text>
-          </TouchableOpacity>
+          <PrimaryButton
+            label="Choose a plan"
+            onPress={() => navigation.replace('MembershipPlans', { memberId, memberName })}
+          />
         </View>
       ) : (
         <View className="flex-1 px-6 pt-6">
@@ -77,11 +77,11 @@ export function MembershipDetailsScreen({ navigation, route }: Props) {
             </View>
           </View>
 
-          <TouchableOpacity
-            className="mt-6 min-h-[44px] items-center justify-center rounded bg-blue-700 py-3 transition-transform duration-150 ease-in-out active:scale-[0.98]"
-            onPress={() => navigation.popToTop()}>
-            <Text className="text-base font-semibold text-zinc-100">Done</Text>
-          </TouchableOpacity>
+          <PrimaryButton
+            label="Done"
+            onPress={() => navigation.popToTop()}
+            className="mt-6 w-full"
+          />
         </View>
       )}
     </View>

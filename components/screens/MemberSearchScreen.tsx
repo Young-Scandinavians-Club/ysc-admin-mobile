@@ -79,8 +79,15 @@ export function MemberSearchScreen({ navigation, route }: Props) {
             { text: 'Cancel', style: 'cancel' },
             {
               text: 'Set up membership',
+              // Carry the event through the membership sign-up so that, once
+              // it's done, the volunteer lands back on this ticket order
+              // instead of at Home.
               onPress: () =>
-                navigation.navigate('MembershipPlans', { memberId: member.id, memberName: name }),
+                navigation.navigate('MembershipPlans', {
+                  memberId: member.id,
+                  memberName: name,
+                  resumeTicket: { eventId: params.eventId, eventTitle: params.eventTitle },
+                }),
             },
           ]
         );
@@ -92,6 +99,7 @@ export function MemberSearchScreen({ navigation, route }: Props) {
         eventTitle: params.eventTitle,
         memberId: member.id,
         memberName: name,
+        autoCharge: true,
       });
     }
   }
@@ -116,6 +124,14 @@ export function MemberSearchScreen({ navigation, route }: Props) {
             autoCapitalize="none"
             autoCorrect={false}
             autoFocus
+            returnKeyType="search"
+            // Enter/"Search" on the keyboard picks the top result, so a
+            // uniquely-named member is select-by-typing with no reach for the
+            // list.
+            onSubmitEditing={() => {
+              const first = results[0];
+              if (!tooShort && !loading && first) selectMember(first);
+            }}
           />
         </View>
       </View>

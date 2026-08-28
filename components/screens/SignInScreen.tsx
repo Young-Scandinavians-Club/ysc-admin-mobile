@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 
+import { PrimaryButton } from '@/components/PrimaryButton';
 import { useAuth } from '@/lib/auth-context';
 
 /**
@@ -71,17 +72,12 @@ export function SignInScreen() {
 
         {error && <Text className="mb-4 text-center text-sm text-rose-600">{error}</Text>}
 
-        <Pressable
-          className="min-h-[44px] items-center justify-center rounded bg-blue-700 py-3 transition-transform duration-150 ease-in-out active:scale-[0.98]"
-          style={{ opacity: submitting ? 0.8 : 1 }}
+        <PrimaryButton
+          label="Sign in"
           onPress={handleSignIn}
-          disabled={submitting}>
-          {submitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text className="text-base font-semibold text-zinc-100">Sign in</Text>
-          )}
-        </Pressable>
+          loading={submitting}
+          className="w-full"
+        />
       </View>
     </View>
   );

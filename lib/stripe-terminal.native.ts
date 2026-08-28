@@ -3,16 +3,17 @@ import {
   useStripeTerminal,
 } from '@stripe/stripe-terminal-react-native';
 import { isDevice } from 'expo-device';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Platform } from 'react-native';
 
 import { api, getEnvironment } from '@/api';
 
 export type CollectStep = 'idle' | 'connecting' | 'collecting' | 'processing' | 'success' | 'error';
 
-export type CollectPaymentOutcome = { success: true } | { success: false; error: string };
+export type CollectPaymentOutcome =
+  { success: true } | { success: false; error: string; code?: string };
 export type CollectSetupOutcome =
-  { success: true; paymentMethodId: string } | { success: false; error: string };
+  { success: true; paymentMethodId: string } | { success: false; error: string; code?: string };
 
 /**
  * Shared Stripe Terminal Tap to Pay flow for both one-off ticket charges
@@ -56,11 +57,89 @@ function discoveryMethod(): 'internet' | 'tapToPay' {
   return isSimulatedReader() && !isDevice ? 'internet' : 'tapToPay';
 }
 
+/**
+ * `initialize()` is a process-wide, once-only SDK call — the reader connection
+ * it sets up is a singleton. Tracked at module scope (not per-hook) so a
+ * `prewarm()` from one screen and a `collectPayment()` from another don't each
+ * try to initialize; the second caller sees this already set and skips it.
+ */
+let terminalInitialized = false;
+
+/**
+ * A connect attempt already running, shared by every concurrent caller so the
+ * `prewarm()` on entering a payment flow and the real `collectPayment()` that
+ * follows don't fire two overlapping discovery/connect sequences at the SDK.
+ * Cleared when it settles so a later attempt can retry after a failure.
+ */
+let connectInFlight: Promise<void> | null = null;
+
+type Terminal = ReturnType<typeof useStripeTerminal>;
+
+async function connectReader(terminal: Terminal): Promise<void> {
+  // Android requires an explicit runtime prompt for location (and, on 12+,
+  // Bluetooth) permissions before Terminal can discover a reader — just
+  // declaring them in app.json's manifest isn't enough. iOS handles this
+  // itself via the Info.plist usage description the first time it's needed,
+  // so this is a no-op there.
+  if (Platform.OS === 'android') {
+    const { error: permissionError } = await requestNeededAndroidPermissions();
+    if (permissionError) {
+      throw new Error(
+        'Location permission is required to connect a card reader. Please grant it in Settings.'
+      );
+    }
+  }
+
+  // The SDK requires initialize() before any other method — including
+  // getConnectionStatus() — so this must run first, not just before connect.
+  if (!terminalInitialized) {
+    const { error: initError } = await terminal.initialize();
+    if (initError) throw toTerminalError(initError);
+    terminalInitialized = true;
+  }
+
+  const connectionStatus = await terminal.getConnectionStatus();
+  if (connectionStatus === 'connected') return;
+
+  const { location_id: locationId } = await api.createTerminalConnectionToken();
+
+  const simulated = isSimulatedReader();
+  const { error: connectError } =
+    discoveryMethod() === 'internet'
+      ? await terminal.easyConnect({ discoveryMethod: 'internet', locationId, simulated })
+      : await terminal.easyConnect({ discoveryMethod: 'tapToPay', locationId, simulated });
+  if (connectError) throw toTerminalError(connectError);
+}
+
+/** Preserve a Stripe error's `.code` on the thrown Error so callers can tell a
+ *  card decline (`DeclinedByStripeAPI` / `DeclinedByReader`) apart from a
+ *  reader/network problem. */
+function toTerminalError(e: { code?: string; message: string }): Error {
+  const err = new Error(e.message) as Error & { code?: string };
+  if (e.code) err.code = e.code;
+  return err;
+}
+
+function errorCode(err: unknown): string | undefined {
+  return err && typeof err === 'object' && 'code' in err
+    ? String((err as { code: unknown }).code)
+    : undefined;
+}
+
+/** Build a failure outcome, omitting `code` entirely when there isn't one
+ *  (rather than setting it to `undefined`, which exactOptionalPropertyTypes
+ *  rejects). */
+function failure(message: string, err: unknown): { success: false; error: string; code?: string } {
+  const code = errorCode(err);
+  return code === undefined
+    ? { success: false, error: message }
+    : { success: false, error: message, code };
+}
+
 export function useTapToPayCollector() {
   const terminal = useStripeTerminal();
   const [step, setStep] = useState<CollectStep>('idle');
   const [error, setError] = useState<string | null>(null);
-  const initialized = useRef(false);
 
   const reset = useCallback(() => {
     setStep('idle');
@@ -68,48 +147,24 @@ export function useTapToPayCollector() {
   }, []);
 
   const ensureConnectedReader = useCallback(async () => {
-    // Android requires an explicit runtime prompt for location (and, on 12+,
-    // Bluetooth) permissions before Terminal can discover a reader — just
-    // declaring them in app.json's manifest isn't enough. iOS handles this
-    // itself via the Info.plist usage description the first time it's
-    // needed, so this is a no-op there.
-    if (Platform.OS === 'android') {
-      const { error: permissionError } = await requestNeededAndroidPermissions();
-      if (permissionError) {
-        throw new Error(
-          'Location permission is required to connect a card reader. Please grant it in Settings.'
-        );
-      }
+    connectInFlight ??= connectReader(terminal);
+    try {
+      await connectInFlight;
+    } finally {
+      connectInFlight = null;
     }
-
-    // The SDK requires initialize() before any other method — including
-    // getConnectionStatus() — so this must run first, not just before connect.
-    if (!initialized.current) {
-      const { error: initError } = await terminal.initialize();
-      if (initError) throw new Error(initError.message);
-      initialized.current = true;
-    }
-
-    const connectionStatus = await terminal.getConnectionStatus();
-    if (connectionStatus === 'connected') return;
-
-    const { location_id: locationId } = await api.createTerminalConnectionToken();
-
-    const simulated = isSimulatedReader();
-    const { error: connectError } =
-      discoveryMethod() === 'internet'
-        ? await terminal.easyConnect({
-            discoveryMethod: 'internet',
-            locationId,
-            simulated,
-          })
-        : await terminal.easyConnect({
-            discoveryMethod: 'tapToPay',
-            locationId,
-            simulated,
-          });
-    if (connectError) throw new Error(connectError.message);
   }, [terminal]);
+
+  /**
+   * Best-effort: connect the reader ahead of time (on entering a payment
+   * flow) so the first real charge doesn't pay the initialize + discover +
+   * connect cost on the critical path. Errors here are swallowed — they'll
+   * resurface with proper handling when `collectPayment`/`collectSetup`
+   * actually runs.
+   */
+  const prewarm = useCallback(() => {
+    void ensureConnectedReader().catch(() => {});
+  }, [ensureConnectedReader]);
 
   // Feeds a Stripe test card number to the simulated reader so a non-prod
   // build can complete "collection" without a real card/NFC tap — only
@@ -118,7 +173,7 @@ export function useTapToPayCollector() {
     async (testCardNumber: string | undefined) => {
       if (!isSimulatedReader() || !testCardNumber) return;
       const { error: cardError } = await terminal.setSimulatedCard(testCardNumber);
-      if (cardError) throw new Error(cardError.message);
+      if (cardError) throw toTerminalError(cardError);
     },
     [terminal]
   );
@@ -132,19 +187,19 @@ export function useTapToPayCollector() {
         await applyTestCard(testCardNumber);
 
         const retrieved = await terminal.retrievePaymentIntent(clientSecret);
-        if (retrieved.error) throw new Error(retrieved.error.message);
+        if (retrieved.error) throw toTerminalError(retrieved.error);
 
         setStep('collecting');
         const collected = await terminal.collectPaymentMethod({
           paymentIntent: retrieved.paymentIntent,
         });
-        if (collected.error) throw new Error(collected.error.message);
+        if (collected.error) throw toTerminalError(collected.error);
 
         setStep('processing');
         const confirmed = await terminal.confirmPaymentIntent({
           paymentIntent: collected.paymentIntent,
         });
-        if (confirmed.error) throw new Error(confirmed.error.message);
+        if (confirmed.error) throw toTerminalError(confirmed.error);
 
         setStep('success');
         return { success: true };
@@ -152,7 +207,7 @@ export function useTapToPayCollector() {
         const message = err instanceof Error ? err.message : 'Payment failed';
         setStep('error');
         setError(message);
-        return { success: false, error: message };
+        return failure(message, err);
       }
     },
     [terminal, ensureConnectedReader, applyTestCard]
@@ -167,7 +222,7 @@ export function useTapToPayCollector() {
         await applyTestCard(testCardNumber);
 
         const retrieved = await terminal.retrieveSetupIntent(clientSecret);
-        if (retrieved.error) throw new Error(retrieved.error.message);
+        if (retrieved.error) throw toTerminalError(retrieved.error);
 
         setStep('collecting');
         const collected = await terminal.collectSetupIntentPaymentMethod({
@@ -181,13 +236,13 @@ export function useTapToPayCollector() {
           allowRedisplay: 'limited',
           collectionReason: 'saveCard',
         });
-        if (collected.error) throw new Error(collected.error.message);
+        if (collected.error) throw toTerminalError(collected.error);
 
         setStep('processing');
         const confirmed = await terminal.confirmSetupIntent({
           setupIntent: collected.setupIntent,
         });
-        if (confirmed.error) throw new Error(confirmed.error.message);
+        if (confirmed.error) throw toTerminalError(confirmed.error);
 
         // For a card_present SetupIntent, `setupIntent.paymentMethodId` is the
         // original, single-use card-present PaymentMethod — Stripe attaches a
@@ -207,11 +262,11 @@ export function useTapToPayCollector() {
         const message = err instanceof Error ? err.message : 'Card setup failed';
         setStep('error');
         setError(message);
-        return { success: false, error: message };
+        return failure(message, err);
       }
     },
     [terminal, ensureConnectedReader, applyTestCard]
   );
 
-  return { step, error, collectPayment, collectSetup, reset };
+  return { step, error, collectPayment, collectSetup, prewarm, reset };
 }
