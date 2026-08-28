@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useEffect } from 'react';
 import { ActivityIndicator, FlatList, Text, TouchableOpacity, View } from 'react-native';
 import useSWR from 'swr';
 
@@ -7,6 +8,7 @@ import { api } from '@/api';
 import type { MembershipPlan } from '@/api/types';
 import type { RootStackParamList } from '@/components/navigation/types';
 import { ScreenHeader } from '@/components/screens/ScreenHeader';
+import { useTapToPayCollector } from '@/lib/stripe-terminal';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MembershipPlans'>;
 
@@ -22,8 +24,15 @@ function formatAmount(plan: MembershipPlan): string {
 }
 
 export function MembershipPlansScreen({ navigation, route }: Props) {
-  const { memberId, memberName } = route.params;
+  const { memberId, memberName, resumeTicket } = route.params;
   const { data, error, isLoading } = useSWR('membership-plans', () => api.membershipPlans());
+
+  // The next screen collects a card — connect the reader now so that step
+  // isn't waiting on a cold reader connection.
+  const { prewarm } = useTapToPayCollector();
+  useEffect(() => {
+    prewarm();
+  }, [prewarm]);
 
   return (
     <View className="flex-1 bg-zinc-50">
@@ -61,6 +70,7 @@ export function MembershipPlansScreen({ navigation, route }: Props) {
                   planId: item.id,
                   planName: item.name,
                   amountLabel: formatAmount(item),
+                  ...(resumeTicket ? { resumeTicket } : {}),
                 })
               }>
               <View className="mr-4 h-11 w-11 items-center justify-center rounded-full bg-blue-50">

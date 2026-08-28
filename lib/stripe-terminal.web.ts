@@ -1,8 +1,9 @@
 export type CollectStep = 'idle' | 'connecting' | 'collecting' | 'processing' | 'success' | 'error';
 
-export type CollectPaymentOutcome = { success: true } | { success: false; error: string };
+export type CollectPaymentOutcome =
+  { success: true } | { success: false; error: string; code?: string };
 export type CollectSetupOutcome =
-  { success: true; paymentMethodId: string } | { success: false; error: string };
+  { success: true; paymentMethodId: string } | { success: false; error: string; code?: string };
 
 const UNSUPPORTED = 'Tap to Pay is only available in the native iOS/Android app.';
 
@@ -31,6 +32,7 @@ export function useTapToPayCollector() {
       success: false,
       error: UNSUPPORTED,
     }),
+    prewarm: () => {},
     reset: () => {},
   };
 }

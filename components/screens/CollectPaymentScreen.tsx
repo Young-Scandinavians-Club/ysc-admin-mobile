@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 
 import { api, ApiClientError } from '@/api';
 import type { RootStackParamList } from '@/components/navigation/types';
+import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenHeader } from '@/components/screens/ScreenHeader';
 import { useTapToPayCollector } from '@/lib/stripe-terminal';
 import { DEFAULT_TEST_CARD, TEST_CARDS } from '@/lib/testCards';
@@ -12,6 +14,19 @@ import { DEFAULT_TEST_CARD, TEST_CARDS } from '@/lib/testCards';
 type Props = NativeStackScreenProps<RootStackParamList, 'CollectPayment'>;
 
 type LocalPhase = 'preparing' | 'finalizing' | 'success' | 'error';
+
+/** A card the customer needs to re-tap (declined / lost network at the reader)
+ *  vs. a problem retrying the same card won't fix (our API, config, bad
+ *  connection to the backend). Drives the error copy and button label. */
+type ErrorKind = 'declined' | 'other';
+
+/** Stripe Terminal SDK error codes that mean "the card itself was refused". */
+const DECLINE_CODES = new Set(['DeclinedByStripeAPI', 'DeclinedByReader']);
+
+function classifyError(outcome: { error: string; code?: string }): ErrorKind {
+  if (outcome.code != null && DECLINE_CODES.has(outcome.code)) return 'declined';
+  return /declin/i.test(outcome.error) ? 'declined' : 'other';
+}
 
 const PHASE_MESSAGE: Record<
   'preparing' | 'connecting' | 'collecting' | 'processing' | 'finalizing',
@@ -29,6 +44,7 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
   const collector = useTapToPayCollector();
   const [localPhase, setLocalPhase] = useState<LocalPhase>('preparing');
   const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<ErrorKind>('other');
   const [testCardId, setTestCardId] = useState(DEFAULT_TEST_CARD.id);
   // Read via a ref (not a `run` dependency) so picking a different test card
   // never re-triggers the mount-time auto-run — it only applies on retry.
@@ -62,12 +78,15 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
 
   const run = useCallback(async () => {
     const testCard = TEST_CARDS.find((c) => c.id === testCardIdRef.current) ?? DEFAULT_TEST_CARD;
+    setErrorKind('other');
 
     try {
       if (params.kind === 'ticket') {
         const tiers: Record<string, number> = {};
         for (const item of params.items) {
-          tiers[item.ticketTierId] = item.quantity;
+          // A donation tier's map value is read by the backend as an amount in
+          // cents; every other tier's value is a ticket quantity.
+          tiers[item.ticketTierId] = item.donationAmountCents ?? item.quantity;
         }
 
         const intent = await api.createTicketPaymentIntent(params.eventId, {
@@ -76,7 +95,10 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
         });
 
         const outcome = await collector.collectPayment(intent.client_secret, testCard.cardNumber);
-        if (!outcome.success) throw new Error(outcome.error);
+        if (!outcome.success) {
+          setErrorKind(classifyError(outcome));
+          throw new Error(outcome.error);
+        }
       } else {
         let paymentMethodId = collectedPaymentMethodIdRef.current;
 
@@ -89,7 +111,10 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
             setupIntent.client_secret,
             testCard.cardNumber
           );
-          if (!outcome.success) throw new Error(outcome.error);
+          if (!outcome.success) {
+            setErrorKind(classifyError(outcome));
+            throw new Error(outcome.error);
+          }
 
           paymentMethodId = outcome.paymentMethodId;
           collectedPaymentMethodIdRef.current = paymentMethodId;
@@ -121,17 +146,28 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
     return () => clearTimeout(timer);
   }, [run]);
 
+  // A short buzz on the outcome so a volunteer at a loud, bright door knows
+  // the charge landed (or didn't) without reading the screen. No-ops on web.
+  useEffect(() => {
+    if (phase === 'success') {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } else if (phase === 'error') {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+    }
+  }, [phase]);
+
   function retry() {
     setError(null);
+    setErrorKind('other');
     setLocalPhase('preparing');
     void run();
   }
 
   // Door-sale flow: a ticket seller works one event at a time, charging one
   // person after another — so success sends them back to a fresh member
-  // search for the *same* event instead of all the way to Home. Membership
-  // sign-ups aren't repeated back-to-back the same way, so those still just
-  // go Home.
+  // search for the *same* event instead of all the way to Home. A membership
+  // that was only a detour on the way to buying tickets (`resumeTicket`)
+  // resumes that ticket purchase; a plain membership sign-up goes Home.
   function handleDone() {
     if (params.kind === 'ticket') {
       navigation.popToTop();
@@ -140,10 +176,30 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
         eventId: params.eventId,
         eventTitle: params.eventTitle,
       });
-    } else {
-      navigation.popToTop();
+      return;
     }
+
+    if (params.resumeTicket) {
+      navigation.popToTop();
+      navigation.navigate('EventTicketQuantities', {
+        eventId: params.resumeTicket.eventId,
+        eventTitle: params.resumeTicket.eventTitle,
+        memberId: params.memberId,
+        memberName: params.memberName,
+        autoCharge: true,
+      });
+      return;
+    }
+
+    navigation.popToTop();
   }
+
+  const successLabel =
+    params.kind === 'ticket'
+      ? 'Sell another ticket'
+      : params.resumeTicket
+        ? 'Continue to tickets'
+        : 'Done';
 
   return (
     <View className="flex-1 bg-zinc-50">
@@ -161,7 +217,9 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
             <View className="mt-3 items-center">
               {params.items.map((item) => (
                 <Text key={item.ticketTierId} className="text-sm text-zinc-500">
-                  {item.quantity}× {item.name}
+                  {item.donationAmountCents != null
+                    ? `${item.name} — ${item.unitPriceLabel}`
+                    : `${item.quantity}× ${item.name}`}
                 </Text>
               ))}
             </View>
@@ -196,32 +254,33 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
         )}
 
         {phase === 'success' ? (
-          <View className="items-center">
-            <View className="mb-4 h-16 w-16 items-center justify-center rounded-full bg-green-50">
-              <Ionicons name="checkmark" size={36} color="#15803d" />
+          <View className="w-full items-center">
+            <View className="mb-5 h-24 w-24 items-center justify-center rounded-full bg-green-50">
+              <Ionicons name="checkmark" size={56} color="#15803d" />
             </View>
-            <Text className="mb-6 text-base font-medium text-zinc-700">
+            <Text className="mb-8 text-xl font-semibold text-zinc-800">
               {params.kind === 'ticket' ? 'Payment successful' : 'Membership activated'}
             </Text>
-            <TouchableOpacity
-              className="min-h-[44px] items-center justify-center rounded bg-blue-700 px-8 py-3 transition-transform duration-150 ease-in-out active:scale-[0.98]"
-              onPress={handleDone}>
-              <Text className="text-base font-semibold text-zinc-100">
-                {params.kind === 'ticket' ? 'Sell another ticket' : 'Done'}
-              </Text>
-            </TouchableOpacity>
+            <PrimaryButton className="w-full" label={successLabel} onPress={handleDone} />
           </View>
         ) : phase === 'error' ? (
-          <View className="items-center">
-            <View className="mb-4 h-16 w-16 items-center justify-center rounded-full bg-rose-50">
-              <Ionicons name="close" size={36} color="#be123c" />
+          <View className="w-full items-center">
+            <View className="mb-5 h-24 w-24 items-center justify-center rounded-full bg-rose-50">
+              <Ionicons name="close" size={56} color="#be123c" />
             </View>
-            {error && <Text className="mb-6 text-center text-sm text-rose-600">{error}</Text>}
-            <TouchableOpacity
-              className="min-h-[44px] items-center justify-center rounded bg-blue-700 px-8 py-3 transition-transform duration-150 ease-in-out active:scale-[0.98]"
-              onPress={retry}>
-              <Text className="text-base font-semibold text-zinc-100">Try again</Text>
-            </TouchableOpacity>
+            <Text className="mb-2 text-xl font-semibold text-zinc-800">
+              {errorKind === 'declined' ? 'Card declined' : 'Payment failed'}
+            </Text>
+            <Text className="mb-8 text-center text-sm text-rose-600">
+              {errorKind === 'declined'
+                ? (error ?? 'The card was declined.') + ' Ask for another card.'
+                : (error ?? 'Something went wrong. Please try again.')}
+            </Text>
+            <PrimaryButton
+              className="w-full"
+              label={errorKind === 'declined' ? 'Try another card' : 'Try again'}
+              onPress={retry}
+            />
           </View>
         ) : (
           <View className="items-center">
