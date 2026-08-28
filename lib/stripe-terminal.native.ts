@@ -6,7 +6,7 @@ import { isDevice } from 'expo-device';
 import { useCallback, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 
-import { api } from '@/api';
+import { api, getEnvironment } from '@/api';
 
 export type CollectStep = 'idle' | 'connecting' | 'collecting' | 'processing' | 'success' | 'error';
 
@@ -19,24 +19,42 @@ export type CollectSetupOutcome =
  * (PaymentIntent) and membership card-on-file setup (SetupIntent). Both
  * share the same connect-a-reader step; only the retrieve/collect/confirm
  * calls differ, per the SDK's separate PaymentIntent/SetupIntent APIs.
- *
- * `simulated` mirrors Stripe's own convention: true in dev builds (no Apple
- * Tap to Pay entitlement / physical NFC hardware needed to exercise the
- * full flow against test-mode Stripe), false in production builds.
  */
-const SIMULATED = __DEV__;
+
+/**
+ * Whether to connect a *simulated* reader instead of real Tap to Pay
+ * hardware. Simulated for every backend except production:
+ *
+ *  - Stripe's production Tap to Pay reader refuses to initialise on an
+ *    Android device with Developer Options enabled ("Developer Options must
+ *    not be enabled when using the production version of the Tap to Pay
+ *    reader"). Sandbox testing happens on developers' own phones, which
+ *    routinely have that on, so a non-prod build must never reach for the
+ *    real reader.
+ *  - Against test-mode Stripe a simulated reader is the intended setup
+ *    anyway: it exercises connect / collect / confirm end to end with no
+ *    NFC hardware or Apple Tap to Pay entitlement.
+ *
+ * Read at connect time, not module load — the in-app environment switcher
+ * (see lib/auth-context.tsx) can move between sandbox and prod at runtime.
+ */
+function isSimulatedReader(): boolean {
+  return getEnvironment() !== 'prod';
+}
 
 /**
  * Tap to Pay needs real NFC hardware just to discover a reader — Stripe's own
  * `simulated` flag doesn't bypass that, and neither the iOS Simulator nor the
- * Android emulator have NFC. In dev builds running on one of those (not a
- * real device), fall back to the `internet` discovery method instead (a
- * simulated WisePOS E reader) so the rest of this flow — connect, collect,
+ * Android emulator have NFC. When using a simulated reader on one of those
+ * (not a real device), fall back to the `internet` discovery method instead
+ * (a simulated WisePOS E reader) so the rest of this flow — connect, collect,
  * confirm — is still fully exercisable with zero hardware. On a real device
  * this stays `tapToPay` as normal. See
  * https://stripe-stripe-terminal-react-native.mintlify.app/guides/testing.
  */
-const DISCOVERY_METHOD = __DEV__ && !isDevice ? 'internet' : 'tapToPay';
+function discoveryMethod(): 'internet' | 'tapToPay' {
+  return isSimulatedReader() && !isDevice ? 'internet' : 'tapToPay';
+}
 
 export function useTapToPayCollector() {
   const terminal = useStripeTerminal();
@@ -77,27 +95,28 @@ export function useTapToPayCollector() {
 
     const { location_id: locationId } = await api.createTerminalConnectionToken();
 
+    const simulated = isSimulatedReader();
     const { error: connectError } =
-      DISCOVERY_METHOD === 'internet'
+      discoveryMethod() === 'internet'
         ? await terminal.easyConnect({
             discoveryMethod: 'internet',
             locationId,
-            simulated: SIMULATED,
+            simulated,
           })
         : await terminal.easyConnect({
             discoveryMethod: 'tapToPay',
             locationId,
-            simulated: SIMULATED,
+            simulated,
           });
     if (connectError) throw new Error(connectError.message);
   }, [terminal]);
 
-  // Feeds a Stripe test card number to the simulated reader so a dev build
-  // can complete "collection" without a real card/NFC tap — only meaningful
-  // (and only ever called) when SIMULATED is true, i.e. dev builds.
+  // Feeds a Stripe test card number to the simulated reader so a non-prod
+  // build can complete "collection" without a real card/NFC tap — only
+  // meaningful when connected to a simulated reader (test-mode Stripe).
   const applyTestCard = useCallback(
     async (testCardNumber: string | undefined) => {
-      if (!__DEV__ || !testCardNumber) return;
+      if (!isSimulatedReader() || !testCardNumber) return;
       const { error: cardError } = await terminal.setSimulatedCard(testCardNumber);
       if (cardError) throw new Error(cardError.message);
     },
