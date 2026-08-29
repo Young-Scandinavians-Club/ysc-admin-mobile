@@ -62,24 +62,26 @@ rules.
 
 ## Sign-in deep linking
 
-Sign-in opens ysc.org's login page in a system browser tab; the website
-then hands a one-time code back to the app. The redirect target depends on
-the backend:
+Sign-in opens the configured backend's login page in a system browser tab
+(`localhost`/`10.0.2.2`, `ysc-sandbox.fly.dev`, or `ysc.org` per the
+environment); the website then hands a one-time code back to the app. The
+redirect target depends on platform and backend:
 
-- **https backend** (sandbox/prod): an **Android App Link**,
+- **Android + https backend** (sandbox/prod): an **Android App Link**,
   `https://<host>/app/auth-callback` — declared in `app.json`
   (`android.intentFilters`, `autoVerify`) and resolved at runtime by
   `lib/mobileRedirect.ts`. A verified App Link opens the app directly; when
   unverified or the app isn't installed it falls back to a web page that
   bounces to the `ysc-admin://` scheme.
-- **http backend** (local dev): the `ysc-admin://auth-callback` custom
-  scheme (App Links require https).
+- **iOS, or any http backend** (local dev): the `ysc-admin://auth-callback`
+  custom scheme. App Links need https; iOS would additionally need Universal
+  Links (`associatedDomains` + `preferUniversalLinks`), which isn't set up.
 
 `expo prebuild` regenerates `android/` (gitignored) from `app.json`, so a
 build picks up the intent filters automatically. The server side — the
 `assetlinks.json` each host must serve, the redirect-URI allowlist, and how
-to get the signing-cert fingerprints — is documented in
-[`../ysc.org/docs/MOBILE_APP_AUTH_HANDOFF.md`](../ysc.org/docs/MOBILE_APP_AUTH_HANDOFF.md).
+to get the signing-cert fingerprints — is documented in ysc.org's
+[`docs/MOBILE_APP_AUTH_HANDOFF.md`](https://github.com/Young-Scandinavians-Club/ysc.org/blob/main/docs/MOBILE_APP_AUTH_HANDOFF.md).
 
 ## Setup
 

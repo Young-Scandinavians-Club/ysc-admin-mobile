@@ -1,7 +1,7 @@
 import * as WebBrowser from 'expo-web-browser';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import { mutate as mutateGlobalCache } from 'swr';
 
 import {
@@ -95,10 +95,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async () => {
     const config = getApiConfig();
     const { codeVerifier, codeChallenge } = await generatePkcePair();
-    // https backend → an Android App Link (`https://<host>/app/auth-callback`),
+    // Android + https backend → an App Link (`https://<host>/app/auth-callback`),
     // which opens the app on a tap and degrades to a web page when it isn't
-    // installed; http/local dev → the `ysc-admin://` custom scheme.
-    const redirectUri = mobileRedirectUri(config.baseUrl);
+    // installed. iOS (no Universal Links set up) and http/local dev → the
+    // `ysc-admin://` custom scheme.
+    const redirectUri = mobileRedirectUri(config.baseUrl, Platform.OS);
     const loginUrl =
       `${config.baseUrl}/users/log-in` +
       `?mobile_redirect_uri=${encodeURIComponent(redirectUri)}` +
