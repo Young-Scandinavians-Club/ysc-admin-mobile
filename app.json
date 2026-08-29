@@ -53,7 +53,26 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "org.ysc.admin"
+      "package": "org.ysc.admin",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [
+            {
+              "scheme": "https",
+              "host": "ysc.org",
+              "pathPrefix": "/app/auth-callback"
+            },
+            {
+              "scheme": "https",
+              "host": "ysc-sandbox.fly.dev",
+              "pathPrefix": "/app/auth-callback"
+            }
+          ]
+        }
+      ]
     },
     "extra": {
       "eas": {
