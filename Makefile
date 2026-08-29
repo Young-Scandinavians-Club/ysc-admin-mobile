@@ -1,4 +1,4 @@
-.PHONY: help lint format test typecheck ios android android-device web
+.PHONY: help lint format test typecheck ios android android-device web release
 
 .DEFAULT_GOAL := help
 
@@ -42,3 +42,6 @@ web: ## Run the app in a browser via expo start --web. ENV=local|sandbox|prod
 		*) echo "error: invalid ENV '$(ENV)' — expected local, sandbox, or prod." >&2; exit 1 ;; \
 	esac
 	@EXPO_PUBLIC_API_ENVIRONMENT=$(ENV) npm run -s web
+
+release: ## Cut a new release: bump version, commit, tag & push (pushing the v* tag triggers the prod build). TAG=v1.2.0 to skip the prompt
+	@./scripts/release.sh $(TAG)
