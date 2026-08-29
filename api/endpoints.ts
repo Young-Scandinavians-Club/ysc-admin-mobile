@@ -9,6 +9,10 @@ import type {
   MembershipSetupIntentResponse,
   MembershipStatusResponse,
   MembersSearchResponse,
+  OfflineMembershipRequest,
+  OfflineMembershipResponse,
+  OfflineTicketOrderRequest,
+  OfflineTicketOrderResponse,
   PasswordSessionResponse,
   SubscribeRequest,
   SubscribeResponse,
@@ -77,6 +81,16 @@ export function membershipStatus(
   });
 }
 
+export function subscribeOfflineMembership(
+  config: ApiClientConfig,
+  body: OfflineMembershipRequest
+): Promise<OfflineMembershipResponse> {
+  return request<OfflineMembershipResponse>(config, '/api/v1/app/memberships/subscribe_offline', {
+    method: 'POST',
+    body,
+  });
+}
+
 export function searchMembers(
   config: ApiClientConfig,
   query: string
@@ -112,6 +126,18 @@ export function createTicketPaymentIntent(
   return request<TicketPaymentIntentResponse>(
     config,
     `/api/v1/app/events/${eventId}/tickets/payment_intent`,
+    { method: 'POST', body }
+  );
+}
+
+export function recordOfflineTicketOrder(
+  config: ApiClientConfig,
+  eventId: string,
+  body: OfflineTicketOrderRequest
+): Promise<OfflineTicketOrderResponse> {
+  return request<OfflineTicketOrderResponse>(
+    config,
+    `/api/v1/app/events/${eventId}/tickets/offline_order`,
     { method: 'POST', body }
   );
 }

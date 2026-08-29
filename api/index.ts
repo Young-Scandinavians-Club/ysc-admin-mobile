@@ -6,13 +6,17 @@ import {
   eventsList as _eventsList,
   membershipPlans as _membershipPlans,
   membershipStatus as _membershipStatus,
+  recordOfflineTicketOrder as _recordOfflineTicketOrder,
   searchMembers as _searchMembers,
   signOut as _signOut,
   subscribeMembership as _subscribeMembership,
+  subscribeOfflineMembership as _subscribeOfflineMembership,
 } from './endpoints';
 import type {
   EventsListParams,
   MembershipSetupIntentRequest,
+  OfflineMembershipRequest,
+  OfflineTicketOrderRequest,
   SubscribeRequest,
   TicketPaymentIntentRequest,
 } from './types';
@@ -45,11 +49,15 @@ export const api = {
   membershipPlans: () => _membershipPlans(getApiConfig()),
   membershipStatus: (memberId: string) => _membershipStatus(getApiConfig(), memberId),
   subscribeMembership: (body: SubscribeRequest) => _subscribeMembership(getApiConfig(), body),
+  subscribeOfflineMembership: (body: OfflineMembershipRequest) =>
+    _subscribeOfflineMembership(getApiConfig(), body),
   createMembershipSetupIntent: (body: MembershipSetupIntentRequest) =>
     _createMembershipSetupIntent(getApiConfig(), body),
   createTerminalConnectionToken: () => _createTerminalConnectionToken(getApiConfig()),
   createTicketPaymentIntent: (eventId: string, body: TicketPaymentIntentRequest) =>
     _createTicketPaymentIntent(getApiConfig(), eventId, body),
+  recordOfflineTicketOrder: (eventId: string, body: OfflineTicketOrderRequest) =>
+    _recordOfflineTicketOrder(getApiConfig(), eventId, body),
   searchMembers: (query: string) => _searchMembers(getApiConfig(), query),
   signOut: () => _signOut(getApiConfig()),
 };
@@ -75,6 +83,11 @@ export type {
   MembershipSetupIntentResponse,
   MembershipStatusResponse,
   MembersSearchResponse,
+  OfflineMembershipRequest,
+  OfflineMembershipResponse,
+  OfflinePaymentMethod,
+  OfflineTicketOrderRequest,
+  OfflineTicketOrderResponse,
   PasswordSessionResponse,
   SubscribeRequest,
   SubscribeResponse,
