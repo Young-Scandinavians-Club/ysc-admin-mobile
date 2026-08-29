@@ -5,7 +5,12 @@
     "owner": "young-scandinavians-club",
     "version": "1.0.0",
     "scheme": "ysc-admin",
+    "primaryColor": "#144993",
+    "backgroundColor": "#ffffff",
     "web": {
+      "name": "YSC Admin",
+      "themeColor": "#144993",
+      "backgroundColor": "#ffffff",
       "favicon": "./assets/favicon.png"
     },
     "experiments": {
