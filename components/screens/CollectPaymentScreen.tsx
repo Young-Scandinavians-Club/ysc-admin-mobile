@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -55,6 +56,24 @@ const OFFLINE_METHODS: readonly { id: OfflinePaymentMethod; label: string }[] = 
   { id: 'check', label: 'Check' },
   { id: 'other', label: 'Other' },
 ];
+
+/** Door sales bypass tier/event capacity — see TicketPaymentIntentResponse's
+ *  `warnings`. Blocks on an explicit choice before a card is charged, since
+ *  unlike the "event already started"/sale-window bypasses (which are always
+ *  fine to just allow), overselling is the seller's call to make each time. */
+function confirmExceedsCapacity(warnings: readonly string[]): Promise<boolean> {
+  return new Promise((resolve) => {
+    Alert.alert(
+      'This exceeds capacity',
+      `${warnings.join('\n\n')}\n\nContinue with the sale anyway?`,
+      [
+        { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'Continue anyway', style: 'destructive', onPress: () => resolve(true) },
+      ],
+      { cancelable: false }
+    );
+  });
+}
 
 export function CollectPaymentScreen({ navigation, route }: Props) {
   const params = route.params;
@@ -145,6 +164,16 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
           member_id: params.memberId,
           tiers,
         });
+        if (stale()) return;
+
+        if (intent.warnings.length > 0) {
+          const proceed = await confirmExceedsCapacity(intent.warnings);
+          if (stale()) return;
+          if (!proceed) {
+            navigation.goBack();
+            return;
+          }
+        }
 
         const outcome = await collector.collectPayment(intent.client_secret, testCard.cardNumber);
         if (!outcome.success) {
@@ -267,19 +296,22 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
     setError(null);
     const note = offlineNote.trim();
     try {
+      let warnings: readonly string[] = [];
+
       if (params.kind === 'ticket') {
         const tiers: Record<string, number> = {};
         for (const item of params.items) {
           tiers[item.ticketTierId] = item.donationAmountCents ?? item.quantity;
         }
         const cents = dollarsToCents(offlineAmount);
-        await api.recordOfflineTicketOrder(params.eventId, {
+        const order = await api.recordOfflineTicketOrder(params.eventId, {
           member_id: params.memberId,
           tiers,
           payment_method: offlineMethod,
           ...(cents != null ? { amount_collected_cents: cents } : {}),
           ...(note ? { note } : {}),
         });
+        warnings = order.warnings;
       } else {
         await api.subscribeOfflineMembership({
           member_id: params.memberId,
@@ -290,6 +322,12 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
       }
       setOfflineOpen(false);
       setLocalPhase('success');
+      // The cash/check is already collected by this point — this is a
+      // heads-up for the record, not a chance to back out (see the card
+      // path's confirmExceedsCapacity for where that choice happens instead).
+      if (warnings.length > 0) {
+        Alert.alert('Exceeded capacity', warnings.join('\n\n'));
+      }
     } catch (err) {
       setErrorKind('other');
       setError(
