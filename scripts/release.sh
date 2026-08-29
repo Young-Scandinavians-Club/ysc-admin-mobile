@@ -212,8 +212,12 @@ echo ""
 
 echo "${TEAL}[2/4] Committing version bump...${RESET}"
 git add "$APP_JSON" "$PACKAGE_JSON"
-git commit -m "Bump version to $APP_VERSION"
-echo "${GREEN}✓ Committed${RESET}"
+if git diff --cached --quiet; then
+  echo "${YELLOW}Version is already $APP_VERSION — nothing to commit, tagging current HEAD.${RESET}"
+else
+  git commit -m "Bump version to $APP_VERSION"
+  echo "${GREEN}✓ Committed${RESET}"
+fi
 echo ""
 
 echo "${TEAL}[3/4] Creating git tag $GIT_TAG...${RESET}"
