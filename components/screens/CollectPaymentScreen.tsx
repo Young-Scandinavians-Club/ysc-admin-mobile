@@ -98,6 +98,10 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
   // moments later, and without this guard that late result would stomp the
   // success/error screen the offline submission produced.
   const offlineTakeoverRef = useRef(false);
+  // Bumped every time a card attempt starts (and when the offline form opens).
+  // Each run() captures its number and only writes state while it still
+  // matches — so a superseded attempt that settles late is a no-op.
+  const attemptRef = useRef(0);
   const [offlineOpen, setOfflineOpen] = useState(false);
   const [offlineMethod, setOfflineMethod] = useState<OfflinePaymentMethod>('cash');
   const [offlineNote, setOfflineNote] = useState('');
@@ -126,6 +130,8 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
 
   const run = useCallback(async () => {
     if (offlineTakeoverRef.current) return;
+    const attempt = ++attemptRef.current;
+    const stale = () => offlineTakeoverRef.current || attemptRef.current !== attempt;
     const testCard = TEST_CARDS.find((c) => c.id === testCardIdRef.current) ?? DEFAULT_TEST_CARD;
     setErrorKind('other');
 
@@ -176,10 +182,10 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
           payment_method_id: paymentMethodId,
         });
       }
-      if (offlineTakeoverRef.current) return;
+      if (stale()) return;
       setLocalPhase('success');
     } catch (err) {
-      if (offlineTakeoverRef.current) return;
+      if (stale()) return;
       setError(
         err instanceof ApiClientError
           ? err.message
@@ -222,6 +228,8 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
 
   function openOfflineForm() {
     offlineTakeoverRef.current = true;
+    // Invalidate any in-flight card attempt so a late outcome can't land.
+    attemptRef.current += 1;
     collector.reset();
     setError(null);
     setErrorKind('other');
@@ -233,7 +241,11 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
   }
 
   // Backing out of the offline form hands the sale back to the card reader.
+  // Ignored while a submission is in flight (incl. the Android hardware Back
+  // button via the Modal's onRequestClose) so we can't start a card charge
+  // for a sale that may be getting recorded offline right now.
   function cancelOffline() {
+    if (submittingOffline) return;
     setOfflineOpen(false);
     offlineTakeoverRef.current = false;
     setLocalPhase('preparing');
