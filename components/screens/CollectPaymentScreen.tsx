@@ -3,10 +3,10 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api, ApiClientError } from '@/api';
 import type { RootStackParamList } from '@/components/navigation/types';
-import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenHeader } from '@/components/screens/ScreenHeader';
 import { useTapToPayCollector } from '@/lib/stripe-terminal';
 import { DEFAULT_TEST_CARD, TEST_CARDS } from '@/lib/testCards';
@@ -41,6 +41,7 @@ const PHASE_MESSAGE: Record<
 
 export function CollectPaymentScreen({ navigation, route }: Props) {
   const params = route.params;
+  const insets = useSafeAreaInsets();
   const collector = useTapToPayCollector();
   const [localPhase, setLocalPhase] = useState<LocalPhase>('preparing');
   const [error, setError] = useState<string | null>(null);
@@ -201,6 +202,64 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
         ? 'Continue to tickets'
         : 'Done';
 
+  // Full-bleed outcome screens: a volunteer at a loud, bright door needs to
+  // read the result in a fraction of a second from arm's length, so the whole
+  // screen goes green or red with one oversized glyph and large white copy.
+  if (phase === 'success') {
+    return (
+      <View
+        className="flex-1 items-center justify-center bg-green-600 px-8"
+        style={{ paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }}>
+        <View className="mb-10 h-44 w-44 items-center justify-center rounded-full bg-white/20">
+          <Ionicons name="checkmark-sharp" size={128} color="#ffffff" />
+        </View>
+        <Text className="text-center text-4xl font-extrabold text-white">
+          {params.kind === 'ticket' ? 'Payment successful' : 'Membership activated'}
+        </Text>
+        <Text className="mt-4 text-center text-3xl font-bold text-white">{amountLabel}</Text>
+        <Text className="mt-2 text-center text-xl font-medium text-green-50">{title}</Text>
+        {params.memberName ? (
+          <Text className="mt-1 text-center text-xl font-medium text-green-50">
+            {params.memberName}
+          </Text>
+        ) : null}
+        <TouchableOpacity
+          className="mt-14 min-h-[64px] w-full items-center justify-center rounded-2xl bg-white px-8 py-4 active:scale-[0.98]"
+          onPress={handleDone}>
+          <Text className="text-xl font-bold text-green-700">{successLabel}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (phase === 'error') {
+    return (
+      <View
+        className="flex-1 items-center justify-center bg-rose-600 px-8"
+        style={{ paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }}>
+        <View className="mb-10 h-44 w-44 items-center justify-center rounded-full bg-white/20">
+          <Ionicons name="close-sharp" size={128} color="#ffffff" />
+        </View>
+        <Text className="text-center text-4xl font-extrabold text-white">
+          {errorKind === 'declined' ? 'Card declined' : 'Payment failed'}
+        </Text>
+        <Text className="mt-4 text-center text-xl font-semibold text-rose-50">
+          {errorKind === 'declined'
+            ? (error ?? 'The card was declined.') + ' Ask for another card.'
+            : (error ?? 'Something went wrong. Please try again.')}
+        </Text>
+        <Text className="mt-6 text-center text-lg font-medium text-rose-100">{amountLabel}</Text>
+        <TouchableOpacity
+          className="mt-14 min-h-[64px] w-full items-center justify-center rounded-2xl bg-white px-8 py-4 active:scale-[0.98]"
+          onPress={retry}>
+          <Text className="text-xl font-bold text-rose-700">
+            {errorKind === 'declined' ? 'Try another card' : 'Try again'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-zinc-50">
       <ScreenHeader
@@ -253,41 +312,10 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
           </View>
         )}
 
-        {phase === 'success' ? (
-          <View className="w-full items-center">
-            <View className="mb-5 h-24 w-24 items-center justify-center rounded-full bg-green-50">
-              <Ionicons name="checkmark" size={56} color="#15803d" />
-            </View>
-            <Text className="mb-8 text-xl font-semibold text-zinc-800">
-              {params.kind === 'ticket' ? 'Payment successful' : 'Membership activated'}
-            </Text>
-            <PrimaryButton className="w-full" label={successLabel} onPress={handleDone} />
-          </View>
-        ) : phase === 'error' ? (
-          <View className="w-full items-center">
-            <View className="mb-5 h-24 w-24 items-center justify-center rounded-full bg-rose-50">
-              <Ionicons name="close" size={56} color="#be123c" />
-            </View>
-            <Text className="mb-2 text-xl font-semibold text-zinc-800">
-              {errorKind === 'declined' ? 'Card declined' : 'Payment failed'}
-            </Text>
-            <Text className="mb-8 text-center text-sm text-rose-600">
-              {errorKind === 'declined'
-                ? (error ?? 'The card was declined.') + ' Ask for another card.'
-                : (error ?? 'Something went wrong. Please try again.')}
-            </Text>
-            <PrimaryButton
-              className="w-full"
-              label={errorKind === 'declined' ? 'Try another card' : 'Try again'}
-              onPress={retry}
-            />
-          </View>
-        ) : (
-          <View className="items-center">
-            <ActivityIndicator size="large" color="#144993" />
-            <Text className="mt-4 text-sm text-zinc-500">{PHASE_MESSAGE[phase]}</Text>
-          </View>
-        )}
+        <View className="items-center">
+          <ActivityIndicator size="large" color="#144993" />
+          <Text className="mt-4 text-sm text-zinc-500">{PHASE_MESSAGE[phase]}</Text>
+        </View>
       </View>
     </View>
   );
