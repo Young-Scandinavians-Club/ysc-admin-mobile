@@ -1,11 +1,9 @@
 name: Sandbox build
 
-# Every push to main (i.e. every merged PR) builds an internal-distribution
-# Android APK against the sandbox backend (see eas.json's `preview`
-# profile), so the team always has a current build to install and try out.
-# iOS isn't built here — ad hoc iOS credentials aren't set up for this
-# profile; add an `ios` step back once that's needed.
-# The finished build's install link is published to a rolling
+# Every push to main (i.e. every merged PR) builds internal-distribution
+# iOS and Android binaries against the sandbox backend (see eas.json's
+# `preview` profile), so the team always has a current build to install and
+# try out. The finished builds' install links are published to a rolling
 # "sandbox-latest" GitHub Release rather than left in the Actions log.
 on:
   push:
@@ -21,10 +19,12 @@ permissions:
 
 jobs:
   build:
-    name: Build and publish
+    name: Build ${{ matrix.platform }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ios, android]
     steps:
       - uses: actions/checkout@v4
 
@@ -40,16 +40,42 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Build android (preview profile, sandbox backend)
+      - name: Build ${{ matrix.platform }} (preview profile, sandbox backend)
         env:
           SHA: ${{ github.sha }}
         run: |
           eas build \
-            --platform android \
+            --platform ${{ matrix.platform }} \
             --profile preview \
             --non-interactive \
             --message "$SHA" \
             --json > build.json
+
+      - name: Record build link
+        run: |
+          id=$(jq -r '.[0].id' build.json)
+          owner=$(jq -r '.expo.owner' app.json)
+          slug=$(jq -r '.expo.slug' app.json)
+          echo "- **${{ matrix.platform }}**: https://expo.dev/accounts/$owner/projects/$slug/builds/$id" \
+            > link-${{ matrix.platform }}.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-link-${{ matrix.platform }}
+          path: link-${{ matrix.platform }}.md
+
+  publish:
+    name: Publish rolling release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: build-link-*
+          path: links
+          merge-multiple: true
 
       - name: Recreate the rolling "sandbox-latest" release
         env:
@@ -57,15 +83,11 @@ jobs:
           SHA: ${{ github.sha }}
           REPOSITORY: ${{ github.repository }}
         run: |
-          id=$(jq -r '.[0].id' build.json)
-          owner=$(jq -r '.expo.owner' app.json)
-          slug=$(jq -r '.expo.slug' app.json)
-          link="https://expo.dev/accounts/$owner/projects/$slug/builds/$id"
           notes="Sandbox build for $SHA, built $(date -u +'%Y-%m-%d %H:%M UTC').
 
-          Install link:
+          Install links:
 
-          - **android**: $link"
+          $(cat links/*.md)"
           gh release delete sandbox-latest --repo "$REPOSITORY" --yes --cleanup-tag || true
           gh release create sandbox-latest --repo "$REPOSITORY" \
             --title "Sandbox (latest)" --notes "$notes" --prerelease \
