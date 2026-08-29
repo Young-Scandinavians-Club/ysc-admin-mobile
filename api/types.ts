@@ -147,6 +147,31 @@ export interface MembershipSetupIntentResponse {
 }
 
 // =============================================================================
+// POST /memberships/subscribe_offline — member paid cash/check in person, no card
+// =============================================================================
+
+/** How an in-person payment was physically collected. `card` is the Tap-to-Pay
+ *  default and is never sent to the offline endpoints. */
+export type OfflinePaymentMethod = 'cash' | 'check' | 'other';
+
+export interface OfflineMembershipRequest {
+  member_id: string;
+  plan: string;
+  /** Defaults to `cash` on the backend when omitted. */
+  payment_method?: OfflinePaymentMethod;
+  /** Free-text reference, e.g. "check #1234" / "envelope 7". */
+  note?: string;
+}
+
+export interface OfflineMembershipResponse {
+  id: string;
+  status: string;
+  plan_id: string;
+  plan_name: string;
+  current_period_end: string | null;
+}
+
+// =============================================================================
 // GET /memberships/status
 // =============================================================================
 
@@ -204,4 +229,28 @@ export interface TicketPaymentIntentResponse {
   client_secret: string;
   amount: number;
   currency: string;
+}
+
+// =============================================================================
+// POST /events/:event_id/tickets/offline_order — tickets paid cash/check, no card
+// =============================================================================
+
+export interface OfflineTicketOrderRequest {
+  member_id: string;
+  /** Map of ticket_tier_id -> quantity, same contract as TicketPaymentIntentRequest. */
+  tiers: Record<string, number>;
+  /** Defaults to `cash` on the backend when omitted. */
+  payment_method?: OfflinePaymentMethod;
+  /** What the volunteer physically collected, in cents. Recorded in the order's
+   *  notes for the treasurer; the order total itself is $0 (a grant). */
+  amount_collected_cents?: number;
+  note?: string;
+}
+
+export interface OfflineTicketOrderResponse {
+  ticket_order_id: string;
+  ticket_order_reference: string;
+  status: string;
+  ticket_count: number;
+  notes: string | null;
 }

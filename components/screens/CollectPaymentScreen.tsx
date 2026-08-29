@@ -2,10 +2,20 @@ import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api, ApiClientError } from '@/api';
+import type { OfflinePaymentMethod } from '@/api/types';
 import type { RootStackParamList } from '@/components/navigation/types';
 import { ScreenHeader } from '@/components/screens/ScreenHeader';
 import { useTapToPayCollector } from '@/lib/stripe-terminal';
@@ -39,6 +49,25 @@ const PHASE_MESSAGE: Record<
   finalizing: 'Saving membership…',
 };
 
+const OFFLINE_METHODS: readonly { id: OfflinePaymentMethod; label: string }[] = [
+  { id: 'cash', label: 'Cash' },
+  { id: 'check', label: 'Check' },
+  { id: 'other', label: 'Other' },
+];
+
+/** "$90.00" / "US$90" → "90.00" for a prefilled amount field. */
+function amountLabelToInput(label: string): string {
+  const digits = label.replace(/[^0-9.]/g, '');
+  return digits.replace(/\.(?=.*\.)/g, '');
+}
+
+/** "90" / "90.5" → 9000 / 9050 cents; blank or nonsense → null (omit the field). */
+function dollarsToCents(input: string): number | null {
+  const n = Number.parseFloat(input);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.round(n * 100);
+}
+
 export function CollectPaymentScreen({ navigation, route }: Props) {
   const params = route.params;
   const insets = useSafeAreaInsets();
@@ -63,6 +92,24 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
   // same payment_method_id.
   const collectedPaymentMethodIdRef = useRef<string | null>(null);
 
+  // Offline (cash/check) takeover. Once the volunteer opens the offline form
+  // we stop the card collector and ignore any outcome it still reports — the
+  // auto-run's in-flight collectPayment/collectSetup can resolve or reject
+  // moments later, and without this guard that late result would stomp the
+  // success/error screen the offline submission produced.
+  const offlineTakeoverRef = useRef(false);
+  const [offlineOpen, setOfflineOpen] = useState(false);
+  const [offlineMethod, setOfflineMethod] = useState<OfflinePaymentMethod>('cash');
+  const [offlineNote, setOfflineNote] = useState('');
+  const [offlineAmount, setOfflineAmount] = useState('');
+  const [submittingOffline, setSubmittingOffline] = useState(false);
+
+  // Donation tiers price by a volunteer-entered amount and the backend's
+  // offline endpoint rejects them (as does the card endpoint) — so hide the
+  // cash affordance rather than let it 422.
+  const hasDonationItem =
+    params.kind === 'ticket' && params.items.some((i) => i.donationAmountCents != null);
+
   const title = params.kind === 'ticket' ? params.eventTitle : params.planName;
   const amountLabel = params.kind === 'ticket' ? params.totalLabel : params.amountLabel;
 
@@ -78,6 +125,7 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
       : localPhase;
 
   const run = useCallback(async () => {
+    if (offlineTakeoverRef.current) return;
     const testCard = TEST_CARDS.find((c) => c.id === testCardIdRef.current) ?? DEFAULT_TEST_CARD;
     setErrorKind('other');
 
@@ -128,8 +176,10 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
           payment_method_id: paymentMethodId,
         });
       }
+      if (offlineTakeoverRef.current) return;
       setLocalPhase('success');
     } catch (err) {
+      if (offlineTakeoverRef.current) return;
       setError(
         err instanceof ApiClientError
           ? err.message
@@ -161,7 +211,77 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
     setError(null);
     setErrorKind('other');
     setLocalPhase('preparing');
+    // An offline submission that failed retries as another offline attempt —
+    // the card reader was already taken out of the flow.
+    if (offlineTakeoverRef.current) {
+      setOfflineOpen(true);
+      return;
+    }
     void run();
+  }
+
+  function openOfflineForm() {
+    offlineTakeoverRef.current = true;
+    collector.reset();
+    setError(null);
+    setErrorKind('other');
+    setOfflineMethod('cash');
+    setOfflineNote('');
+    setOfflineAmount(params.kind === 'ticket' ? amountLabelToInput(params.totalLabel) : '');
+    setLocalPhase('preparing');
+    setOfflineOpen(true);
+  }
+
+  // Backing out of the offline form hands the sale back to the card reader.
+  function cancelOffline() {
+    setOfflineOpen(false);
+    offlineTakeoverRef.current = false;
+    setLocalPhase('preparing');
+    void run();
+  }
+
+  async function submitOffline() {
+    setSubmittingOffline(true);
+    setError(null);
+    const note = offlineNote.trim();
+    try {
+      if (params.kind === 'ticket') {
+        const tiers: Record<string, number> = {};
+        for (const item of params.items) {
+          tiers[item.ticketTierId] = item.donationAmountCents ?? item.quantity;
+        }
+        const cents = dollarsToCents(offlineAmount);
+        await api.recordOfflineTicketOrder(params.eventId, {
+          member_id: params.memberId,
+          tiers,
+          payment_method: offlineMethod,
+          ...(cents != null ? { amount_collected_cents: cents } : {}),
+          ...(note ? { note } : {}),
+        });
+      } else {
+        await api.subscribeOfflineMembership({
+          member_id: params.memberId,
+          plan: params.planId,
+          payment_method: offlineMethod,
+          ...(note ? { note } : {}),
+        });
+      }
+      setOfflineOpen(false);
+      setLocalPhase('success');
+    } catch (err) {
+      setErrorKind('other');
+      setError(
+        err instanceof ApiClientError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Could not record the payment'
+      );
+      setOfflineOpen(false);
+      setLocalPhase('error');
+    } finally {
+      setSubmittingOffline(false);
+    }
   }
 
   // Door-sale flow: a ticket seller works one event at a time, charging one
@@ -314,9 +434,116 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
 
         <View className="items-center">
           <ActivityIndicator size="large" color="#144993" />
-          <Text className="mt-4 text-sm text-zinc-500">{PHASE_MESSAGE[phase]}</Text>
+          <Text className="mt-4 text-sm text-zinc-500">
+            {submittingOffline ? 'Recording payment…' : PHASE_MESSAGE[phase]}
+          </Text>
         </View>
+
+        {!submittingOffline && !hasDonationItem && (
+          <TouchableOpacity
+            className="mt-10 min-h-[44px] items-center justify-center px-4 py-2"
+            onPress={openOfflineForm}>
+            <Text className="text-base font-semibold text-blue-700">
+              Record cash or check payment
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
+
+      <Modal visible={offlineOpen} transparent animationType="slide" onRequestClose={cancelOffline}>
+        <KeyboardAvoidingView
+          className="flex-1 justify-end"
+          style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View
+            className="rounded-t-3xl bg-white px-6 pt-6"
+            style={{ paddingBottom: insets.bottom + 24 }}>
+            <Text className="text-xl font-bold text-zinc-900">
+              {params.kind === 'ticket'
+                ? 'Record cash / check sale'
+                : 'Record cash / check membership'}
+            </Text>
+            <Text className="mt-1 text-sm text-zinc-500">
+              {title} · {amountLabel}
+            </Text>
+
+            <Text className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Payment method
+            </Text>
+            <View className="flex-row gap-2">
+              {OFFLINE_METHODS.map((m) => (
+                <TouchableOpacity
+                  key={m.id}
+                  className={`min-h-[44px] flex-1 items-center justify-center rounded-xl border ${
+                    offlineMethod === m.id
+                      ? 'border-blue-700 bg-blue-700'
+                      : 'border-zinc-200 bg-white'
+                  }`}
+                  onPress={() => setOfflineMethod(m.id)}>
+                  <Text
+                    className={`text-base font-semibold ${
+                      offlineMethod === m.id ? 'text-white' : 'text-zinc-700'
+                    }`}>
+                    {m.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {params.kind === 'ticket' && (
+              <>
+                <Text className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                  Amount collected
+                </Text>
+                <View className="flex-row items-center rounded-xl border border-zinc-200 px-3">
+                  <Text className="text-lg font-semibold text-zinc-400">$</Text>
+                  <TextInput
+                    className="ml-1 min-h-[48px] flex-1 text-lg font-semibold text-zinc-900"
+                    placeholder="0.00"
+                    placeholderTextColor="#d4d4d8"
+                    keyboardType="decimal-pad"
+                    value={offlineAmount}
+                    onChangeText={setOfflineAmount}
+                  />
+                </View>
+              </>
+            )}
+
+            <Text className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Note (optional)
+            </Text>
+            <TextInput
+              className="min-h-[48px] rounded-xl border border-zinc-200 px-3 py-2 text-base text-zinc-900"
+              placeholder="check #1234, envelope 7…"
+              placeholderTextColor="#d4d4d8"
+              value={offlineNote}
+              onChangeText={setOfflineNote}
+            />
+
+            {error && offlineOpen ? (
+              <Text className="mt-3 text-sm font-medium text-rose-600">{error}</Text>
+            ) : null}
+
+            <TouchableOpacity
+              className="mt-6 min-h-[56px] items-center justify-center rounded bg-blue-700 px-8 py-4 active:scale-[0.98]"
+              style={{ opacity: submittingOffline ? 0.8 : 1 }}
+              disabled={submittingOffline}
+              onPress={() => void submitOffline()}>
+              {submittingOffline ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text className="text-lg font-semibold text-zinc-100">Record payment</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="mt-2 min-h-[44px] items-center justify-center px-4 py-2"
+              disabled={submittingOffline}
+              onPress={cancelOffline}>
+              <Text className="text-base font-medium text-zinc-500">Back to card</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
