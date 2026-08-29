@@ -39,11 +39,11 @@ modules, so it always requires a custom dev client (`expo prebuild` +
 
 Three environments, matching the backend's deploys:
 
-| Environment | Base URL | Stripe mode |
-| --- | --- | --- |
-| `local` (default) | `http://localhost:4000` (`10.0.2.2:4000` on Android emulator) | test |
-| `sandbox` | `https://ysc-sandbox.fly.dev` | test |
-| `prod` | `https://ysc.org` | live |
+| Environment       | Base URL                                                      | Stripe mode |
+| ----------------- | ------------------------------------------------------------- | ----------- |
+| `local` (default) | `http://localhost:4000` (`10.0.2.2:4000` on Android emulator) | test        |
+| `sandbox`         | `https://ysc-sandbox.fly.dev`                                 | test        |
+| `prod`            | `https://ysc.org`                                             | live        |
 
 `make ios`/`make android`/`make web` default to **local** — run `ysc.org`
 locally (`mix phx.server`) alongside this app. Pick a different one with
@@ -59,6 +59,27 @@ build, the environment is set by the build profile instead (see `eas.json`:
 `development`/`preview` → sandbox, `production` → prod), regardless of this
 default — see `api/config.ts`'s `DEFAULT_ENVIRONMENT` for the exact fallback
 rules.
+
+## Sign-in deep linking
+
+Sign-in opens ysc.org's login page in a system browser tab; the website
+then hands a one-time code back to the app. The redirect target depends on
+the backend:
+
+- **https backend** (sandbox/prod): an **Android App Link**,
+  `https://<host>/app/auth-callback` — declared in `app.json`
+  (`android.intentFilters`, `autoVerify`) and resolved at runtime by
+  `lib/mobileRedirect.ts`. A verified App Link opens the app directly; when
+  unverified or the app isn't installed it falls back to a web page that
+  bounces to the `ysc-admin://` scheme.
+- **http backend** (local dev): the `ysc-admin://auth-callback` custom
+  scheme (App Links require https).
+
+`expo prebuild` regenerates `android/` (gitignored) from `app.json`, so a
+build picks up the intent filters automatically. The server side — the
+`assetlinks.json` each host must serve, the redirect-URI allowlist, and how
+to get the signing-cert fingerprints — is documented in
+[`../ysc.org/docs/MOBILE_APP_AUTH_HANDOFF.md`](../ysc.org/docs/MOBILE_APP_AUTH_HANDOFF.md).
 
 ## Setup
 
@@ -100,10 +121,10 @@ the team as installable builds via EAS's **internal distribution**. Two
 workflows build automatically and publish each build's install link to the
 repo's **Releases** page — no digging through Actions logs:
 
-| Trigger | Workflow | Platforms | `eas.json` profile | Backend | Where the links land |
-| --- | --- | --- | --- | --- | --- |
-| Every push to `main` (i.e. every merged PR) | [`sandbox-build`](.github/workflows/sandbox-build.yml) | Android only | `preview` | sandbox | the rolling [`sandbox-latest`](../../releases/tag/sandbox-latest) release, recreated on every push |
-| Pushing a version tag, e.g. `git tag v1.2.0 && git push origin v1.2.0` (from `main`) | [`release-build`](.github/workflows/release-build.yml) | iOS + Android | `production` | prod | the release for that tag |
+| Trigger                                                                              | Workflow                                               | Platforms     | `eas.json` profile | Backend | Where the links land                                                                               |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------ | ------------- | ------------------ | ------- | -------------------------------------------------------------------------------------------------- |
+| Every push to `main` (i.e. every merged PR)                                          | [`sandbox-build`](.github/workflows/sandbox-build.yml) | Android only  | `preview`          | sandbox | the rolling [`sandbox-latest`](../../releases/tag/sandbox-latest) release, recreated on every push |
+| Pushing a version tag, e.g. `git tag v1.2.0 && git push origin v1.2.0` (from `main`) | [`release-build`](.github/workflows/release-build.yml) | iOS + Android | `production`       | prod    | the release for that tag                                                                           |
 
 So the team can always bookmark `sandbox-latest` for a current Android build
 to poke at, while a tagged release is the deliberate "ship this to prod"
@@ -146,7 +167,7 @@ web admin dashboard rather than a re-skin:
   `disabled:opacity-80`, and `active:scale-[0.98]` — matches the web
   `<.button>` component's press state exactly, one-to-one, as plain NativeWind
   utility classes (`transition-transform duration-150 ease-in-out
-  active:scale-[0.98]`). Entrance fades (e.g. on `SignInScreen`) are likewise
+active:scale-[0.98]`). Entrance fades (e.g. on `SignInScreen`) are likewise
   a plain `transition-all`/`opacity`/`translate-y` class toggle, not an
   imperative animation call.
 - **Cards**: `bg-white rounded-xl border border-zinc-100`, matching the web's

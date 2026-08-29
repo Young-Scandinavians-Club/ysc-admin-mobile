@@ -15,15 +15,10 @@ import {
 } from '@/api';
 import type { AppUser } from '@/api/types';
 import { clearStoredSession, loadStoredSession, saveStoredSession } from '@/lib/authStorage';
+import { isMobileRedirect, mobileRedirectUri } from '@/lib/mobileRedirect';
 import { generatePkcePair } from '@/lib/pkce';
 
 type AuthStatus = 'loading' | 'signed_out' | 'signed_in';
-
-/**
- * Must match the `scheme` in app.json and the exact string ysc.org's
- * `YscWeb.UserAuth.valid_mobile_redirect_uri?/1` allowlists.
- */
-const MOBILE_REDIRECT_URI = 'ysc-admin://auth-callback';
 
 interface AuthContextValue {
   status: AuthStatus;
@@ -100,9 +95,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async () => {
     const config = getApiConfig();
     const { codeVerifier, codeChallenge } = await generatePkcePair();
+    // https backend → an Android App Link (`https://<host>/app/auth-callback`),
+    // which opens the app on a tap and degrades to a web page when it isn't
+    // installed; http/local dev → the `ysc-admin://` custom scheme.
+    const redirectUri = mobileRedirectUri(config.baseUrl);
     const loginUrl =
       `${config.baseUrl}/users/log-in` +
-      `?mobile_redirect_uri=${encodeURIComponent(MOBILE_REDIRECT_URI)}` +
+      `?mobile_redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&code_challenge=${codeChallenge}`;
 
     // On some Android/Chrome combinations, openAuthSessionAsync's own promise
@@ -117,14 +116,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         let settled = false;
 
         const subscription = Linking.addEventListener('url', ({ url }) => {
-          if (settled || !url.startsWith(MOBILE_REDIRECT_URI)) return;
+          if (settled || !isMobileRedirect(url, redirectUri)) return;
           settled = true;
           subscription.remove();
           void WebBrowser.dismissBrowser();
           resolve(url);
         });
 
-        WebBrowser.openAuthSessionAsync(loginUrl, MOBILE_REDIRECT_URI)
+        WebBrowser.openAuthSessionAsync(loginUrl, redirectUri)
           .then((result) => {
             if (settled) return;
             settled = true;
