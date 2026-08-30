@@ -18,6 +18,7 @@ import { api, ApiClientError } from '@/api';
 import type { OfflinePaymentMethod } from '@/api/types';
 import type { RootStackParamList } from '@/components/navigation/types';
 import { ScreenHeader } from '@/components/screens/ScreenHeader';
+import { amountLabelToInput, dollarsToCents } from '@/lib/money';
 import { useTapToPayCollector } from '@/lib/stripe-terminal';
 import { DEFAULT_TEST_CARD, TEST_CARDS } from '@/lib/testCards';
 
@@ -55,19 +56,6 @@ const OFFLINE_METHODS: readonly { id: OfflinePaymentMethod; label: string }[] = 
   { id: 'other', label: 'Other' },
 ];
 
-/** "$90.00" / "US$90" → "90.00" for a prefilled amount field. */
-function amountLabelToInput(label: string): string {
-  const digits = label.replace(/[^0-9.]/g, '');
-  return digits.replace(/\.(?=.*\.)/g, '');
-}
-
-/** "90" / "90.5" → 9000 / 9050 cents; blank or nonsense → null (omit the field). */
-function dollarsToCents(input: string): number | null {
-  const n = Number.parseFloat(input);
-  if (!Number.isFinite(n) || n < 0) return null;
-  return Math.round(n * 100);
-}
-
 export function CollectPaymentScreen({ navigation, route }: Props) {
   const params = route.params;
   const insets = useSafeAreaInsets();
@@ -92,12 +80,27 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
   // same payment_method_id.
   const collectedPaymentMethodIdRef = useRef<string | null>(null);
 
+  // Donation tiers price by a volunteer-entered amount and the backend's
+  // offline endpoint rejects them (as does the card endpoint) — so hide the
+  // cash affordance rather than let it 422.
+  const hasDonationItem =
+    params.kind === 'ticket' && params.items.some((i) => i.donationAmountCents != null);
+
+  // Long-pressed "Continue" to land here straight in cash mode. Ignored for
+  // donation carts, which offline collection can't handle — those fall back
+  // to the normal card flow.
+  const wantsOfflineStart = params.startOffline === true && !hasDonationItem;
+
   // Offline (cash/check) takeover. Once the volunteer opens the offline form
   // we stop the card collector and ignore any outcome it still reports — the
   // auto-run's in-flight collectPayment/collectSetup can resolve or reject
   // moments later, and without this guard that late result would stomp the
   // success/error screen the offline submission produced.
-  const offlineTakeoverRef = useRef(false);
+  //
+  // Starts true for a long-press cash start — that suppresses the mount-time
+  // card auto-run entirely (run() bails on this ref), and the effect below
+  // opens the form.
+  const offlineTakeoverRef = useRef(wantsOfflineStart);
   // Bumped every time a card attempt starts (and when the offline form opens).
   // Each run() captures its number and only writes state while it still
   // matches — so a superseded attempt that settles late is a no-op.
@@ -107,12 +110,6 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
   const [offlineNote, setOfflineNote] = useState('');
   const [offlineAmount, setOfflineAmount] = useState('');
   const [submittingOffline, setSubmittingOffline] = useState(false);
-
-  // Donation tiers price by a volunteer-entered amount and the backend's
-  // offline endpoint rejects them (as does the card endpoint) — so hide the
-  // cash affordance rather than let it 422.
-  const hasDonationItem =
-    params.kind === 'ticket' && params.items.some((i) => i.donationAmountCents != null);
 
   const title = params.kind === 'ticket' ? params.eventTitle : params.planName;
   const amountLabel = params.kind === 'ticket' ? params.totalLabel : params.amountLabel;
@@ -202,6 +199,19 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
     const timer = setTimeout(() => void run(), 0);
     return () => clearTimeout(timer);
   }, [run]);
+
+  // Arrived in cash mode via a long-press on the previous screen: open the
+  // offline form immediately instead of the (suppressed) card flow.
+  const startedOfflineRef = useRef(false);
+  useEffect(() => {
+    if (!wantsOfflineStart || startedOfflineRef.current) return;
+    startedOfflineRef.current = true;
+    offlineTakeoverRef.current = true;
+    setOfflineMethod('cash');
+    setOfflineNote('');
+    setOfflineAmount(params.kind === 'ticket' ? amountLabelToInput(params.totalLabel) : '');
+    setOfflineOpen(true);
+  }, [wantsOfflineStart, params]);
 
   // A short buzz on the outcome so a volunteer at a loud, bright door knows
   // the charge landed (or didn't) without reading the screen. No-ops on web.
@@ -319,7 +329,6 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
         eventTitle: params.resumeTicket.eventTitle,
         memberId: params.memberId,
         memberName: params.memberName,
-        autoCharge: true,
       });
       return;
     }
@@ -444,14 +453,16 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
           </View>
         )}
 
-        <View className="items-center">
-          <ActivityIndicator size="large" color="#144993" />
-          <Text className="mt-4 text-sm text-zinc-500">
-            {submittingOffline ? 'Recording payment…' : PHASE_MESSAGE[phase]}
-          </Text>
-        </View>
+        {(!offlineOpen || submittingOffline) && (
+          <View className="items-center">
+            <ActivityIndicator size="large" color="#144993" />
+            <Text className="mt-4 text-sm text-zinc-500">
+              {submittingOffline ? 'Recording payment…' : PHASE_MESSAGE[phase]}
+            </Text>
+          </View>
+        )}
 
-        {!submittingOffline && !hasDonationItem && (
+        {!offlineOpen && !submittingOffline && !hasDonationItem && (
           <TouchableOpacity
             className="mt-10 min-h-[44px] items-center justify-center px-4 py-2"
             onPress={openOfflineForm}>

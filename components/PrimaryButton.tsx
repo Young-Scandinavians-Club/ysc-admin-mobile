@@ -13,12 +13,17 @@ import { ActivityIndicator, Pressable, Text } from 'react-native';
 export function PrimaryButton({
   label,
   onPress,
+  onLongPress,
+  delayLongPress = 500,
   disabled = false,
   loading = false,
   className = '',
 }: {
   label: string;
   onPress: () => void;
+  /** Optional press-and-hold action (e.g. the cash / check door-sale path). */
+  onLongPress?: () => void;
+  delayLongPress?: number;
   disabled?: boolean;
   loading?: boolean;
   className?: string;
@@ -30,7 +35,9 @@ export function PrimaryButton({
       className={`min-h-[56px] items-center justify-center rounded bg-blue-700 px-8 py-4 transition-transform duration-150 ease-in-out active:scale-[0.98] ${className}`}
       style={{ opacity: inactive ? 0.8 : 1 }}
       disabled={inactive}
-      onPress={onPress}>
+      onPress={onPress}
+      onLongPress={inactive ? undefined : onLongPress}
+      delayLongPress={delayLongPress}>
       {loading ? (
         <ActivityIndicator color="#fff" />
       ) : (

@@ -99,7 +99,6 @@ export function MemberSearchScreen({ navigation, route }: Props) {
         eventTitle: params.eventTitle,
         memberId: member.id,
         memberName: name,
-        autoCharge: true,
       });
     }
   }

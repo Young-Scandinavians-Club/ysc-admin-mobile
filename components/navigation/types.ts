@@ -20,8 +20,14 @@ export interface TicketSelectionItem {
   donationAmountCents?: number;
 }
 
+/** Skip the card reader on arrival and open the cash / check form straight
+ *  away. Set when the seller long-presses "Continue" (or a membership plan
+ *  row) — a deliberate gesture for the cash-only door, since the reader
+ *  otherwise auto-starts and buries the on-screen offline button. */
+type StartOfflineFlag = { startOffline?: boolean };
+
 export type CollectPaymentParams =
-  | {
+  | ({
       kind: 'membership';
       memberId: string;
       memberName: string;
@@ -29,8 +35,8 @@ export type CollectPaymentParams =
       planName: string;
       amountLabel: string;
       resumeTicket?: ResumeTicket;
-    }
-  | {
+    } & StartOfflineFlag)
+  | ({
       kind: 'ticket';
       memberId: string;
       memberName: string;
@@ -38,7 +44,7 @@ export type CollectPaymentParams =
       eventTitle: string;
       items: readonly TicketSelectionItem[];
       totalLabel: string;
-    };
+    } & StartOfflineFlag);
 
 export type RootStackParamList = {
   SignIn: undefined;
@@ -51,10 +57,6 @@ export type RootStackParamList = {
     eventTitle: string;
     memberId: string;
     memberName: string;
-    /** When set, skip this screen entirely and go straight to card collection
-     *  if the event has exactly one payable tier and it's a fixed-price
-     *  `paid` tier — the common "one general-admission ticket" door sale. */
-    autoCharge?: boolean;
   };
   CollectPayment: CollectPaymentParams;
 };

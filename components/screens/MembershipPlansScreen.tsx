@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as Haptics from 'expo-haptics';
 import { useEffect } from 'react';
 import { ActivityIndicator, FlatList, Text, TouchableOpacity, View } from 'react-native';
 import useSWR from 'swr';
@@ -26,6 +27,19 @@ function formatAmount(plan: MembershipPlan): string {
 export function MembershipPlansScreen({ navigation, route }: Props) {
   const { memberId, memberName, resumeTicket } = route.params;
   const { data, error, isLoading } = useSWR('membership-plans', () => api.membershipPlans());
+
+  function goToCollectPayment(plan: MembershipPlan, startOffline: boolean) {
+    navigation.navigate('CollectPayment', {
+      kind: 'membership',
+      memberId,
+      memberName,
+      planId: plan.id,
+      planName: plan.name,
+      amountLabel: formatAmount(plan),
+      ...(resumeTicket ? { resumeTicket } : {}),
+      ...(startOffline ? { startOffline: true } : {}),
+    });
+  }
 
   // The next screen collects a card — connect the reader now so that step
   // isn't waiting on a cold reader connection.
@@ -59,20 +73,21 @@ export function MembershipPlansScreen({ navigation, route }: Props) {
           data={data?.data ?? []}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+          ListHeaderComponent={
+            (data?.data.length ?? 0) > 0 ? (
+              <Text className="mb-3 px-1 text-xs text-zinc-400">
+                Tap a plan to take a card. Press and hold to record a cash or check payment.
+              </Text>
+            ) : null
+          }
           renderItem={({ item }) => (
             <TouchableOpacity
               className="mb-3 flex-row items-center rounded-xl border border-zinc-100 bg-white p-4 transition-transform duration-150 ease-in-out active:scale-[0.98]"
-              onPress={() =>
-                navigation.navigate('CollectPayment', {
-                  kind: 'membership',
-                  memberId,
-                  memberName,
-                  planId: item.id,
-                  planName: item.name,
-                  amountLabel: formatAmount(item),
-                  ...(resumeTicket ? { resumeTicket } : {}),
-                })
-              }>
+              onPress={() => goToCollectPayment(item, false)}
+              onLongPress={() => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                goToCollectPayment(item, true);
+              }}>
               <View className="mr-4 h-11 w-11 items-center justify-center rounded-full bg-blue-50">
                 <Ionicons name="card-outline" size={20} color="#144993" />
               </View>

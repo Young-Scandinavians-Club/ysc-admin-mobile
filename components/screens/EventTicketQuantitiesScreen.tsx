@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useEffect, useRef, useState } from 'react';
+import * as Haptics from 'expo-haptics';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -81,7 +82,7 @@ function totalLabelFor(items: TicketSelectionItem[]): string {
 }
 
 export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
-  const { eventId, eventTitle, memberId, memberName, autoCharge } = route.params;
+  const { eventId, eventTitle, memberId, memberName } = route.params;
   const insets = useSafeAreaInsets();
   const { data, error, isLoading } = useSWR('events', () => api.eventsList({ page_size: 50 }));
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -143,36 +144,26 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
   });
 
   const hasSelection = selectedItems.length > 0;
+  // Offline (cash/check) collection can't handle donation tiers — the backend
+  // rejects them — so the long-press shortcut is only offered without one.
+  const canRecordOffline =
+    hasSelection && !selectedItems.some((item) => item.donationAmountCents != null);
 
-  // Door-sale fast path: a member selected for an event with exactly one
-  // fixed-price tier almost always means "one general-admission ticket,
-  // charge them" — so skip this screen and go straight to card collection.
-  // Guarded by a ref so pressing back from CollectPayment lands on this
-  // picker rather than bouncing forward again. Donation tiers need an amount
-  // typed in, so they never take this path.
-  const autoChargedRef = useRef(false);
-  useEffect(() => {
-    if (autoChargedRef.current || !autoCharge || isLoading || !data) return;
-    const found = data.data.find((item) => item.id === eventId);
-    const payable = (found?.ticket_tiers ?? []).filter(isPayable);
-    const only = payable.length === 1 ? payable[0] : undefined;
-    if (!only || only.type !== 'paid') return;
-    if (only.available !== null && only.available <= 0) return;
-
-    autoChargedRef.current = true;
-    const items: TicketSelectionItem[] = [
-      { ticketTierId: only.id, name: only.name, quantity: 1, unitPriceLabel: priceLabel(only) },
-    ];
-    navigation.navigate('CollectPayment', {
-      kind: 'ticket',
-      memberId,
-      memberName,
-      eventId,
-      eventTitle,
-      items,
-      totalLabel: totalLabelFor(items),
-    });
-  }, [autoCharge, isLoading, data, eventId, eventTitle, memberId, memberName, navigation]);
+  const goToCollectPayment = useCallback(
+    (startOffline: boolean) => {
+      navigation.navigate('CollectPayment', {
+        kind: 'ticket',
+        memberId,
+        memberName,
+        eventId,
+        eventTitle,
+        items: selectedItems,
+        totalLabel: totalLabelFor(selectedItems),
+        ...(startOffline ? { startOffline: true } : {}),
+      });
+    },
+    [navigation, memberId, memberName, eventId, eventTitle, selectedItems]
+  );
 
   return (
     <View className="flex-1 bg-zinc-50">
@@ -295,18 +286,21 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
               ? `Continue — ${totalLabelFor(selectedItems)}`
               : 'Select at least one ticket'
           }
-          onPress={() =>
-            navigation.navigate('CollectPayment', {
-              kind: 'ticket',
-              memberId,
-              memberName,
-              eventId,
-              eventTitle,
-              items: selectedItems,
-              totalLabel: totalLabelFor(selectedItems),
-            })
-          }
+          onPress={() => goToCollectPayment(false)}
+          {...(canRecordOffline
+            ? {
+                onLongPress: () => {
+                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                  goToCollectPayment(true);
+                },
+              }
+            : {})}
         />
+        {canRecordOffline && (
+          <Text className="mt-2 text-center text-xs text-zinc-400">
+            Hold to record a cash or check payment
+          </Text>
+        )}
       </View>
     </View>
   );
