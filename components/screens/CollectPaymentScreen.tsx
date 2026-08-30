@@ -166,8 +166,13 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
         });
         if (stale()) return;
 
-        if (intent.warnings.length > 0) {
-          const proceed = await confirmExceedsCapacity(intent.warnings);
+        // Defensive: the type says `warnings` is always an array, but that's
+        // not guaranteed at runtime (an older backend deploy during a
+        // rolling release, a malformed response) — don't let a missing field
+        // throw here and abandon a payment that's otherwise fine to collect.
+        const ticketWarnings = intent.warnings ?? [];
+        if (ticketWarnings.length > 0) {
+          const proceed = await confirmExceedsCapacity(ticketWarnings);
           if (stale()) return;
           if (!proceed) {
             navigation.goBack();
@@ -311,7 +316,7 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
           ...(cents != null ? { amount_collected_cents: cents } : {}),
           ...(note ? { note } : {}),
         });
-        warnings = order.warnings;
+        warnings = order.warnings ?? [];
       } else {
         await api.subscribeOfflineMembership({
           member_id: params.memberId,
