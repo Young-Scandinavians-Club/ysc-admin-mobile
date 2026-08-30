@@ -108,11 +108,15 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
     return Math.round(dollars * 100);
   }
 
+  // No upper cap: the backend's door-sale endpoints deliberately allow
+  // exceeding a tier's remaining quantity (and the event's max_attendees),
+  // surfacing it as a warning to confirm on the next screen rather than
+  // blocking the sale outright — see AppTicketsController's `bypass_guards`.
+  // Capping the stepper here would make that capability unreachable.
   function adjust(tier: EventTicketTier, delta: number) {
     setQuantities((prev) => {
       const current = prev[tier.id] ?? 0;
-      const max = tier.available ?? Number.POSITIVE_INFINITY;
-      const next = Math.max(0, Math.min(current + delta, max));
+      const next = Math.max(0, current + delta);
       return { ...prev, [tier.id]: next };
     });
   }
@@ -193,14 +197,17 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
           renderItem={({ item }) => {
             const quantity = quantityFor(item.id);
             const soldOut = item.available !== null && item.available <= 0;
-            const atMax = item.available !== null && quantity >= item.available;
+            // Sold out / at capacity is shown, not enforced — a door sale can
+            // deliberately exceed it (see adjust()'s comment), warned about
+            // and confirmed on the next screen rather than blocked here.
+            const exceedsAvailable = item.available !== null && quantity > item.available;
             const isDonation = item.type === 'donation';
-            const rowTapAdds = !isDonation && !soldOut && !atMax;
+            const rowTapAdds = !isDonation;
 
             return (
               <Pressable
                 className="mb-3 flex-row items-center rounded-xl border border-zinc-100 bg-white p-4"
-                style={{ opacity: soldOut ? 0.5 : 1 }}
+                style={{ opacity: soldOut && quantity === 0 ? 0.5 : 1 }}
                 // No `disabled` — that can swallow touches meant for the
                 // stepper buttons inside. Omitting onPress is enough to make
                 // the row inert when a tap shouldn't add one.
@@ -215,9 +222,14 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
                 </View>
                 <View className="flex-1">
                   <Text className="text-base font-semibold text-zinc-900">{item.name}</Text>
-                  <Text className="mt-1 text-sm font-medium text-blue-700">
-                    {soldOut ? 'Sold out' : priceLabel(item)}
-                  </Text>
+                  <Text className="mt-1 text-sm font-medium text-blue-700">{priceLabel(item)}</Text>
+                  {exceedsAvailable ? (
+                    <Text className="mt-0.5 text-xs font-medium text-amber-600">
+                      Exceeds the {item.available} left
+                    </Text>
+                  ) : soldOut ? (
+                    <Text className="mt-0.5 text-xs font-medium text-zinc-400">Sold out</Text>
+                  ) : null}
                 </View>
 
                 {isDonation ? (
@@ -235,7 +247,7 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
                       accessibilityLabel={`${item.name} amount in dollars`}
                     />
                   </View>
-                ) : soldOut ? null : (
+                ) : (
                   <View className="flex-row items-center">
                     <TouchableOpacity
                       className="h-16 w-16 items-center justify-center"
@@ -253,14 +265,9 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
                     </Text>
                     <TouchableOpacity
                       className="h-16 w-16 items-center justify-center"
-                      disabled={atMax}
                       onPress={() => adjust(item, 1)}
                       accessibilityLabel={`Increase ${item.name} quantity`}>
-                      <Ionicons
-                        name="add-circle-outline"
-                        size={44}
-                        color={atMax ? '#d4d4d8' : '#144993'}
-                      />
+                      <Ionicons name="add-circle-outline" size={44} color="#144993" />
                     </TouchableOpacity>
                   </View>
                 )}
