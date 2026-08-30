@@ -144,6 +144,10 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
   });
 
   const hasSelection = selectedItems.length > 0;
+  // Offline (cash/check) collection can't handle donation tiers — the backend
+  // rejects them — so the long-press shortcut is only offered without one.
+  const canRecordOffline =
+    hasSelection && !selectedItems.some((item) => item.donationAmountCents != null);
 
   const goToCollectPayment = useCallback(
     (startOffline: boolean) => {
@@ -283,12 +287,16 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
               : 'Select at least one ticket'
           }
           onPress={() => goToCollectPayment(false)}
-          onLongPress={() => {
-            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-            goToCollectPayment(true);
-          }}
+          {...(canRecordOffline
+            ? {
+                onLongPress: () => {
+                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                  goToCollectPayment(true);
+                },
+              }
+            : {})}
         />
-        {hasSelection && (
+        {canRecordOffline && (
           <Text className="mt-2 text-center text-xs text-zinc-400">
             Hold to record a cash or check payment
           </Text>
