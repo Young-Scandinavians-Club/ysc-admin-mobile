@@ -97,7 +97,11 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
   // auto-run's in-flight collectPayment/collectSetup can resolve or reject
   // moments later, and without this guard that late result would stomp the
   // success/error screen the offline submission produced.
-  const offlineTakeoverRef = useRef(false);
+  //
+  // Starts true when the seller long-pressed "Continue" to come straight here
+  // in cash mode — that suppresses the mount-time card auto-run entirely
+  // (run() bails on this ref), and the effect below opens the form.
+  const offlineTakeoverRef = useRef(params.startOffline === true);
   // Bumped every time a card attempt starts (and when the offline form opens).
   // Each run() captures its number and only writes state while it still
   // matches — so a superseded attempt that settles late is a no-op.
@@ -202,6 +206,19 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
     const timer = setTimeout(() => void run(), 0);
     return () => clearTimeout(timer);
   }, [run]);
+
+  // Arrived in cash mode via a long-press on the previous screen: open the
+  // offline form immediately instead of the (suppressed) card flow.
+  const startedOfflineRef = useRef(false);
+  useEffect(() => {
+    if (!params.startOffline || startedOfflineRef.current) return;
+    startedOfflineRef.current = true;
+    offlineTakeoverRef.current = true;
+    setOfflineMethod('cash');
+    setOfflineNote('');
+    setOfflineAmount(params.kind === 'ticket' ? amountLabelToInput(params.totalLabel) : '');
+    setOfflineOpen(true);
+  }, [params]);
 
   // A short buzz on the outcome so a volunteer at a loud, bright door knows
   // the charge landed (or didn't) without reading the screen. No-ops on web.
@@ -444,14 +461,16 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
           </View>
         )}
 
-        <View className="items-center">
-          <ActivityIndicator size="large" color="#144993" />
-          <Text className="mt-4 text-sm text-zinc-500">
-            {submittingOffline ? 'Recording payment…' : PHASE_MESSAGE[phase]}
-          </Text>
-        </View>
+        {(!offlineOpen || submittingOffline) && (
+          <View className="items-center">
+            <ActivityIndicator size="large" color="#144993" />
+            <Text className="mt-4 text-sm text-zinc-500">
+              {submittingOffline ? 'Recording payment…' : PHASE_MESSAGE[phase]}
+            </Text>
+          </View>
+        )}
 
-        {!submittingOffline && !hasDonationItem && (
+        {!offlineOpen && !submittingOffline && !hasDonationItem && (
           <TouchableOpacity
             className="mt-10 min-h-[44px] items-center justify-center px-4 py-2"
             onPress={openOfflineForm}>

@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useEffect, useRef, useState } from 'react';
+import * as Haptics from 'expo-haptics';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -143,6 +144,22 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
   });
 
   const hasSelection = selectedItems.length > 0;
+
+  const goToCollectPayment = useCallback(
+    (startOffline: boolean) => {
+      navigation.navigate('CollectPayment', {
+        kind: 'ticket',
+        memberId,
+        memberName,
+        eventId,
+        eventTitle,
+        items: selectedItems,
+        totalLabel: totalLabelFor(selectedItems),
+        ...(startOffline ? { startOffline: true } : {}),
+      });
+    },
+    [navigation, memberId, memberName, eventId, eventTitle, selectedItems]
+  );
 
   // Door-sale fast path: a member selected for an event with exactly one
   // fixed-price tier almost always means "one general-admission ticket,
@@ -295,18 +312,17 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
               ? `Continue — ${totalLabelFor(selectedItems)}`
               : 'Select at least one ticket'
           }
-          onPress={() =>
-            navigation.navigate('CollectPayment', {
-              kind: 'ticket',
-              memberId,
-              memberName,
-              eventId,
-              eventTitle,
-              items: selectedItems,
-              totalLabel: totalLabelFor(selectedItems),
-            })
-          }
+          onPress={() => goToCollectPayment(false)}
+          onLongPress={() => {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+            goToCollectPayment(true);
+          }}
         />
+        {hasSelection && (
+          <Text className="mt-2 text-center text-xs text-zinc-400">
+            Hold to record a cash or check payment
+          </Text>
+        )}
       </View>
     </View>
   );
