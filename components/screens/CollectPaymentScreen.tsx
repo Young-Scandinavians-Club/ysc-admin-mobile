@@ -336,7 +336,6 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
         eventTitle: params.resumeTicket.eventTitle,
         memberId: params.memberId,
         memberName: params.memberName,
-        autoCharge: true,
       });
       return;
     }

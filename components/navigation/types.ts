@@ -57,10 +57,6 @@ export type RootStackParamList = {
     eventTitle: string;
     memberId: string;
     memberName: string;
-    /** When set, skip this screen entirely and go straight to card collection
-     *  if the event has exactly one payable tier and it's a fixed-price
-     *  `paid` tier — the common "one general-admission ticket" door sale. */
-    autoCharge?: boolean;
   };
   CollectPayment: CollectPaymentParams;
 };
