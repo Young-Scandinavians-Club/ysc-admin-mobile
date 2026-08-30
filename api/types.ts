@@ -229,6 +229,11 @@ export interface TicketPaymentIntentResponse {
   client_secret: string;
   amount: number;
   currency: string;
+  /** Door sales bypass the website's "event already started"/sale-window/capacity
+   *  guards (this app is used *during* an event to solve on-the-spot problems),
+   *  but exceeding a tier's or the event's capacity isn't silent — each overage
+   *  shows up here as a human-readable warning to surface before charging. */
+  warnings: string[];
 }
 
 // =============================================================================
@@ -253,4 +258,6 @@ export interface OfflineTicketOrderResponse {
   status: string;
   ticket_count: number;
   notes: string | null;
+  /** See `TicketPaymentIntentResponse.warnings` — same bypass, same warnings. */
+  warnings: string[];
 }
