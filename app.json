@@ -3,7 +3,7 @@
     "name": "YSC Admin",
     "slug": "ysc-admin",
     "owner": "young-scandinavians-club",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "scheme": "ysc-admin",
     "primaryColor": "#144993",
     "backgroundColor": "#ffffff",
