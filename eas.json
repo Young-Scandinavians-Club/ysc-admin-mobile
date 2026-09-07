@@ -19,13 +19,22 @@
     },
     "production": {
       "autoIncrement": true,
-      "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_API_ENVIRONMENT": "prod"
+      },
+      "ios": {
+        "distribution": "store"
+      },
+      "android": {
+        "distribution": "internal"
       }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6809510227"
+      }
+    }
   }
 }
