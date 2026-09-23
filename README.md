@@ -118,23 +118,27 @@ make test        # jest
 
 ## Releases
 
-This app isn't on the App Store / Play Store — it's distributed straight to
-the team as installable builds via EAS's **internal distribution**. Two
-workflows build automatically and publish each build's install link to the
-repo's **Releases** page — no digging through Actions logs:
+The **Play Store** isn't used — Android is distributed straight to the team as
+installable `.apk` builds via EAS's **internal distribution**. **iOS** goes
+through **TestFlight**: the tagged release build is an App Store build that
+`eas submit` pushes to App Store Connect, and testers install it from the
+TestFlight app. Two workflows build automatically and publish to the repo's
+**Releases** page — no digging through Actions logs:
 
-| Trigger                                                                              | Workflow                                               | Platforms     | `eas.json` profile | Backend | Where the links land                                                                               |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------ | ------------- | ------------------ | ------- | -------------------------------------------------------------------------------------------------- |
-| Every push to `main` (i.e. every merged PR)                                          | [`sandbox-build`](.github/workflows/sandbox-build.yml) | Android only  | `preview`          | sandbox | the rolling [`sandbox-latest`](../../releases/tag/sandbox-latest) release, recreated on every push |
-| Pushing a version tag, e.g. `git tag v1.2.0 && git push origin v1.2.0` (from `main`) | [`release-build`](.github/workflows/release-build.yml) | iOS + Android | `production`       | prod    | the release for that tag                                                                           |
+| Trigger                                                                              | Workflow                                               | Platforms     | `eas.json` profile | Backend | iOS         | Android            | Where it lands                                                                                     |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------ | ------------- | ------------------ | ------- | ----------- | ----------------- | ------------------------------------------------------------------------------------------------- |
+| Every push to `main` (i.e. every merged PR)                                          | [`sandbox-build`](.github/workflows/sandbox-build.yml) | Android only  | `preview`          | sandbox | —           | internal `.apk`   | the rolling [`sandbox-latest`](../../releases/tag/sandbox-latest) release, recreated on every push |
+| Pushing a version tag, e.g. `git tag v1.2.0 && git push origin v1.2.0` (from `main`) | [`release-build`](.github/workflows/release-build.yml) | iOS + Android | `production`       | prod    | TestFlight  | internal `.apk`   | the release for that tag                                                                          |
 
 So the team can always bookmark `sandbox-latest` for a current Android build
 to poke at, while a tagged release is the deliberate "ship this to prod"
-build, on both platforms, with its own permanent release page.
+build — Android as an install link, iOS to TestFlight — with its own permanent
+release page.
 
-`sandbox-build` skips iOS for now — internal-distribution iOS builds need ad
-hoc credentials set up interactively per profile (see below), which hasn't
-been done for `preview`. Add an `ios` step back once that's worth doing.
+`sandbox-build` is Android-only: a sandbox iOS build would need its own
+App Store Connect version churn (or ad hoc credentials for `preview`), which
+isn't worth it — use a `development` build (`make ios`) for day-to-day iOS
+testing against sandbox.
 
 One-time setup:
 
@@ -142,17 +146,30 @@ One-time setup:
   token](https://expo.dev/accounts/[account]/settings/access-tokens) with
   permission to build this project, added under repo Settings → Secrets and
   variables → Actions.
-- **iOS credentials** (production builds only, for now): internal-distribution
-  iOS builds are ad hoc, which needs a distribution certificate + ad hoc
-  provisioning profile set up once, interactively:
-  `eas credentials --platform ios --profile production`. Each teammate's
-  device UDID also needs registering before it can install a build:
-  `eas device:create` (adds it to the ad hoc provisioning profile; the next
-  iOS build picks it up). Android has no such step — the `.apk` install link
-  just works.
+- **App Store Connect app record** (done): the app for bundle ID
+  `org.ysc.admin` exists; its numeric Apple ID is wired into `eas.json` →
+  `submit.production.ios.ascAppId`. `appleTeamId` is omitted — `eas submit`
+  resolves it from the API key below; add it there only if submit ever
+  reports an ambiguous team.
+- **App Store Connect API key** (done): a key with the **App Manager** role,
+  uploaded to EAS so `eas submit` uses it automatically in CI via the
+  existing `EXPO_TOKEN`. The `.p8` is stored by EAS, not committed or kept as
+  a GitHub secret.
+- **iOS signing** (App Store distribution): run
+  `eas build --platform ios --profile production` once **interactively** from
+  a checkout so EAS can create the distribution certificate + App Store
+  provisioning profile. After that the CI build runs `--non-interactive`
+  against those stored credentials. No more per-device UDID registration —
+  that was only for the old ad hoc builds.
+- **First TestFlight build**: after the first successful `eas submit`, add
+  testers in App Store Connect → TestFlight. Internal testers (org users, up
+  to 100) get builds within minutes, no review. External testers need a group
+  plus a one-time **Beta App Review** and "Test Information" (what to test, a
+  contact email, and a demo login since sign-in goes through ysc.org).
 
-Team members install straight from the build's EAS page (QR code or link);
-no TestFlight/Play internal-testing enrollment needed.
+Android testers install straight from the build's EAS page (QR code or link).
+iOS testers install via the **TestFlight** app once they've accepted the
+invite.
 
 ## Design system
 

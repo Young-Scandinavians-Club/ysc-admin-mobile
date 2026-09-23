@@ -1,10 +1,12 @@
 name: Release build
 
 # Pushing a release tag (e.g. `v1.2.0`) to any branch — in practice always
-# cut from `main` — builds internal-distribution iOS/Android binaries against
-# the prod backend (see eas.json's `production` profile) so the team can
-# install them without an app store. The finished builds' install links are
-# published to the tag's GitHub Release rather than left in the Actions log.
+# cut from `main` — builds iOS/Android binaries against the prod backend (see
+# eas.json's `production` profile):
+#   - iOS: an App Store build, auto-submitted to TestFlight (`eas submit`).
+#   - Android: an internal-distribution `.apk` the team installs from a link.
+# The iOS TestFlight status and the Android install link are published to the
+# tag's GitHub Release rather than left in the Actions log.
 on:
   push:
     tags:
@@ -36,15 +38,20 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Build ${{ matrix.platform }} (production profile, internal distribution)
+      - name: Build ${{ matrix.platform }} (production profile)
         env:
           TAG: ${{ github.ref_name }}
+          # iOS is an App Store build pushed to TestFlight; --auto-submit runs
+          # `eas submit` with the `production` submit profile once the build is
+          # done. Android stays an internal-distribution install link.
+          AUTO_SUBMIT: ${{ matrix.platform == 'ios' && '--auto-submit' || '' }}
         run: |
           eas build \
             --platform ${{ matrix.platform }} \
             --profile production \
             --non-interactive \
             --message "$TAG" \
+            $AUTO_SUBMIT \
             --json > build.json
 
       - name: Record build link
@@ -52,8 +59,12 @@ jobs:
           id=$(jq -r '.[0].id' build.json)
           owner=$(jq -r '.expo.owner' app.json)
           slug=$(jq -r '.expo.slug' app.json)
-          echo "- **${{ matrix.platform }}**: https://expo.dev/accounts/$owner/projects/$slug/builds/$id" \
-            > link-${{ matrix.platform }}.md
+          url="https://expo.dev/accounts/$owner/projects/$slug/builds/$id"
+          if [ "${{ matrix.platform }}" = "ios" ]; then
+            echo "- **ios**: submitted to TestFlight — [build details]($url)" > link-ios.md
+          else
+            echo "- **android**: [install link]($url)" > link-android.md
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
@@ -79,7 +90,7 @@ jobs:
           TAG: ${{ github.ref_name }}
           REPOSITORY: ${{ github.repository }}
         run: |
-          notes="Install links:
+          notes="Builds:
 
           $(cat links/*.md)"
           if gh release view "$TAG" --repo "$REPOSITORY" >/dev/null 2>&1; then
