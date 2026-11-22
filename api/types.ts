@@ -40,6 +40,12 @@ export interface EventPricingInfo {
   lowest_price: string | null;
 }
 
+/** Who a ticket tier is sold to (`TicketTier.sale_audience` on the backend).
+ *  `member_guests` (the default) and `members_only` both need an active
+ *  membership; `public` can be bought by anyone, including a guest with no
+ *  account. */
+export type TierSaleAudience = 'member_guests' | 'members_only' | 'public';
+
 export interface EventTicketTier {
   id: string;
   name: string;
@@ -51,6 +57,8 @@ export interface EventTicketTier {
   /** Remaining quantity (quantity - tickets_sold); null when quantity is unlimited/unset. */
   available: number | null;
   requires_registration: boolean;
+  /** Absent on a backend that predates public ticket sales — treat as not public. */
+  sale_audience?: TierSaleAudience;
   start_date: string | null;
   end_date: string | null;
 }
@@ -216,11 +224,17 @@ export interface ConnectionTokenResponse {
 // POST /events/:event_id/tickets/payment_intent
 // =============================================================================
 
-export interface TicketPaymentIntentRequest {
-  member_id: string;
+/** Who a door sale is for: an existing account, or a guest identified only by
+ *  name and email (public tiers only — the same guest_* fields the website's
+ *  guest checkout stores on `ticket_orders`). */
+export type TicketBuyerFields =
+  | { member_id: string }
+  | { guest_first_name: string; guest_last_name?: string; guest_email: string };
+
+export type TicketPaymentIntentRequest = TicketBuyerFields & {
   /** Map of ticket_tier_id -> quantity, e.g. { [tierId]: 2 } — one order can span multiple tiers. */
   tiers: Record<string, number>;
-}
+};
 
 export interface TicketPaymentIntentResponse {
   ticket_order_id: string;
@@ -240,8 +254,7 @@ export interface TicketPaymentIntentResponse {
 // POST /events/:event_id/tickets/offline_order — tickets paid cash/check, no card
 // =============================================================================
 
-export interface OfflineTicketOrderRequest {
-  member_id: string;
+export type OfflineTicketOrderRequest = TicketBuyerFields & {
   /** Map of ticket_tier_id -> quantity, same contract as TicketPaymentIntentRequest. */
   tiers: Record<string, number>;
   /** Defaults to `cash` on the backend when omitted. */
@@ -250,7 +263,7 @@ export interface OfflineTicketOrderRequest {
    *  notes for the treasurer; the order total itself is $0 (a grant). */
   amount_collected_cents?: number;
   note?: string;
-}
+};
 
 export interface OfflineTicketOrderResponse {
   ticket_order_id: string;

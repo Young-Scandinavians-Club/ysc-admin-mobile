@@ -5,6 +5,7 @@ import type { RootStackParamList } from './types';
 
 import { CollectPaymentScreen } from '@/components/screens/CollectPaymentScreen';
 import { EventTicketQuantitiesScreen } from '@/components/screens/EventTicketQuantitiesScreen';
+import { GuestDetailsScreen } from '@/components/screens/GuestDetailsScreen';
 import { HomeScreen } from '@/components/screens/HomeScreen';
 import { MemberSearchScreen } from '@/components/screens/MemberSearchScreen';
 import { MembershipDetailsScreen } from '@/components/screens/MembershipDetailsScreen';
@@ -35,6 +36,7 @@ export function AppNavigator() {
           <>
             <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="MemberSearch" component={MemberSearchScreen} />
+            <Stack.Screen name="GuestDetails" component={GuestDetailsScreen} />
             <Stack.Screen name="MembershipDetails" component={MembershipDetailsScreen} />
             <Stack.Screen name="MembershipPlans" component={MembershipPlansScreen} />
             <Stack.Screen name="EventTicketQuantities" component={EventTicketQuantitiesScreen} />

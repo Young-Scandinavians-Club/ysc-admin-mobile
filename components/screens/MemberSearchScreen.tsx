@@ -10,12 +10,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import useSWR from 'swr';
 
 import { api, ApiClientError } from '@/api';
 import type { Member } from '@/api/types';
 import { Avatar } from '@/components/Avatar';
-import type { RootStackParamList } from '@/components/navigation/types';
+import type { RootStackParamList, TicketBuyer } from '@/components/navigation/types';
 import { ScreenHeader } from '@/components/screens/ScreenHeader';
+import { hasPublicPayableTier } from '@/lib/ticketBuyer';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MemberSearch'>;
 
@@ -29,6 +31,14 @@ export function MemberSearchScreen({ navigation, route }: Props) {
   const [results, setResults] = useState<Member[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Same SWR key as Home / ticket selection, so this is normally already cached.
+  // Only needed to know whether the event sells any public tiers.
+  const { data: eventsData } = useSWR('events', () => api.eventsList({ page_size: 50 }));
+  const ticketEventId = params.purpose === 'ticket' ? params.eventId : null;
+  const offersPublicTickets = hasPublicPayableTier(
+    eventsData?.data.find((event) => event.id === ticketEventId)?.ticket_tiers
+  );
 
   const trimmedQuery = query.trim();
   const tooShort = trimmedQuery.length < 2;
@@ -72,11 +82,32 @@ export function MemberSearchScreen({ navigation, route }: Props) {
       }
     } else {
       if (!member.has_active_membership) {
+        const buyer: TicketBuyer = {
+          kind: 'member',
+          memberId: member.id,
+          memberName: name,
+          hasActiveMembership: false,
+        };
         Alert.alert(
           'No active membership',
-          `${name} does not have an active membership. An active membership is required to purchase event tickets.`,
+          offersPublicTickets
+            ? `${name} does not have an active membership. They can buy this event's public tickets, but other tickets need a membership.`
+            : `${name} does not have an active membership. An active membership is required to purchase event tickets.`,
           [
             { text: 'Cancel', style: 'cancel' },
+            ...(offersPublicTickets
+              ? [
+                  {
+                    text: 'Buy public tickets',
+                    onPress: () =>
+                      navigation.navigate('EventTicketQuantities', {
+                        eventId: params.eventId,
+                        eventTitle: params.eventTitle,
+                        buyer,
+                      }),
+                  },
+                ]
+              : []),
             {
               text: 'Set up membership',
               // Carry the event through the membership sign-up so that, once
@@ -97,8 +128,12 @@ export function MemberSearchScreen({ navigation, route }: Props) {
       navigation.navigate('EventTicketQuantities', {
         eventId: params.eventId,
         eventTitle: params.eventTitle,
-        memberId: member.id,
-        memberName: name,
+        buyer: {
+          kind: 'member',
+          memberId: member.id,
+          memberName: name,
+          hasActiveMembership: true,
+        },
       });
     }
   }
@@ -150,6 +185,30 @@ export function MemberSearchScreen({ navigation, route }: Props) {
           data={tooShort ? [] : results}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+          ListHeaderComponent={
+            params.purpose === 'ticket' && offersPublicTickets ? (
+              <TouchableOpacity
+                className="mb-3 flex-row items-center rounded-xl border border-green-100 bg-green-50 p-4 active:scale-[0.98]"
+                onPress={() =>
+                  navigation.navigate('GuestDetails', {
+                    eventId: params.eventId,
+                    eventTitle: params.eventTitle,
+                  })
+                }
+                accessibilityLabel="Sell public tickets to a guest">
+                <View className="mr-4 h-11 w-11 items-center justify-center rounded-full bg-green-100">
+                  <Ionicons name="person-add-outline" size={20} color="#15803d" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-base font-semibold text-green-900">Sell to a guest</Text>
+                  <Text className="mt-0.5 text-sm text-green-800">
+                    No account needed — public tickets only
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#15803d" />
+              </TouchableOpacity>
+            ) : null
+          }
           renderItem={({ item }) => (
             <TouchableOpacity
               className="mb-3 flex-row items-center rounded-xl border border-zinc-100 bg-white p-4 transition-transform duration-150 ease-in-out active:scale-[0.98]"
