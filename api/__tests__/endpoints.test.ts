@@ -1,4 +1,8 @@
-import { recordOfflineTicketOrder, subscribeOfflineMembership } from '@/api/endpoints';
+import {
+  createTicketPaymentIntent,
+  recordOfflineTicketOrder,
+  subscribeOfflineMembership,
+} from '@/api/endpoints';
 
 describe('offline payment endpoints', () => {
   const config = { baseUrl: 'https://ysc-sandbox.fly.dev', token: 'test-token' };
@@ -71,5 +75,31 @@ describe('offline payment endpoints', () => {
       amount_collected_cents: 9000,
     });
     expect(res.ticket_count).toBe(2);
+  });
+
+  it('createTicketPaymentIntent sends guest fields instead of member_id for a guest buyer', async () => {
+    const fetchMock = mockJson({
+      ticket_order_id: 'o2',
+      ticket_order_reference: 'ORD-2',
+      payment_intent_id: 'pi_1',
+      client_secret: 'secret',
+      amount: 2000,
+      currency: 'usd',
+      warnings: [],
+    });
+
+    await createTicketPaymentIntent(config, 'evt1', {
+      guest_first_name: 'Gus',
+      guest_email: 'gus@example.com',
+      tiers: { t1: 1 },
+    });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://ysc-sandbox.fly.dev/api/v1/app/events/evt1/tickets/payment_intent');
+    expect(JSON.parse(init.body)).toEqual({
+      guest_first_name: 'Gus',
+      guest_email: 'gus@example.com',
+      tiers: { t1: 1 },
+    });
   });
 });

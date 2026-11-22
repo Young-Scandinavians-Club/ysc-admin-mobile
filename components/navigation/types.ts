@@ -9,6 +9,13 @@ export interface ResumeTicket {
   eventTitle: string;
 }
 
+/** Who a ticket order is for. A member is an existing account (found via
+ *  search); a guest is a walk-up buyer with no account, identified by name and
+ *  email, who can only buy tiers sold to the public. */
+export type TicketBuyer =
+  | { kind: 'member'; memberId: string; memberName: string; hasActiveMembership: boolean }
+  | { kind: 'guest'; firstName: string; lastName: string; email: string };
+
 export interface TicketSelectionItem {
   ticketTierId: string;
   name: string;
@@ -38,8 +45,7 @@ export type CollectPaymentParams =
     } & StartOfflineFlag)
   | ({
       kind: 'ticket';
-      memberId: string;
-      memberName: string;
+      buyer: TicketBuyer;
       eventId: string;
       eventTitle: string;
       items: readonly TicketSelectionItem[];
@@ -52,11 +58,11 @@ export type RootStackParamList = {
   MemberSearch: MemberSearchPurpose;
   MembershipDetails: { memberId: string; memberName: string };
   MembershipPlans: { memberId: string; memberName: string; resumeTicket?: ResumeTicket };
+  GuestDetails: { eventId: string; eventTitle: string };
   EventTicketQuantities: {
     eventId: string;
     eventTitle: string;
-    memberId: string;
-    memberName: string;
+    buyer: TicketBuyer;
   };
   CollectPayment: CollectPaymentParams;
 };

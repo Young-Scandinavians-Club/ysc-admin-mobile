@@ -22,6 +22,7 @@ import { ScreenHeader } from '@/components/screens/ScreenHeader';
 import { amountLabelToInput, dollarsToCents } from '@/lib/money';
 import { useTapToPayCollector } from '@/lib/stripe-terminal';
 import { DEFAULT_TEST_CARD, TEST_CARDS } from '@/lib/testCards';
+import { buyerName, buyerRequestFields } from '@/lib/ticketBuyer';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CollectPayment'>;
 
@@ -131,6 +132,7 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
   const [submittingOffline, setSubmittingOffline] = useState(false);
 
   const title = params.kind === 'ticket' ? params.eventTitle : params.planName;
+  const payerName = params.kind === 'ticket' ? buyerName(params.buyer) : params.memberName;
   const amountLabel = params.kind === 'ticket' ? params.totalLabel : params.amountLabel;
 
   // While the terminal SDK is actively connecting/collecting/processing, its own
@@ -161,7 +163,7 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
         }
 
         const intent = await api.createTicketPaymentIntent(params.eventId, {
-          member_id: params.memberId,
+          ...buyerRequestFields(params.buyer),
           tiers,
         });
         if (stale()) return;
@@ -310,7 +312,7 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
         }
         const cents = dollarsToCents(offlineAmount);
         const order = await api.recordOfflineTicketOrder(params.eventId, {
-          member_id: params.memberId,
+          ...buyerRequestFields(params.buyer),
           tiers,
           payment_method: offlineMethod,
           ...(cents != null ? { amount_collected_cents: cents } : {}),
@@ -370,8 +372,13 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
       navigation.navigate('EventTicketQuantities', {
         eventId: params.resumeTicket.eventId,
         eventTitle: params.resumeTicket.eventTitle,
-        memberId: params.memberId,
-        memberName: params.memberName,
+        // The membership was just bought, so this buyer is now a full member.
+        buyer: {
+          kind: 'member',
+          memberId: params.memberId,
+          memberName: params.memberName,
+          hasActiveMembership: true,
+        },
       });
       return;
     }
@@ -402,10 +409,8 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
         </Text>
         <Text className="mt-4 text-center text-3xl font-bold text-white">{amountLabel}</Text>
         <Text className="mt-2 text-center text-xl font-medium text-green-50">{title}</Text>
-        {params.memberName ? (
-          <Text className="mt-1 text-center text-xl font-medium text-green-50">
-            {params.memberName}
-          </Text>
+        {payerName ? (
+          <Text className="mt-1 text-center text-xl font-medium text-green-50">{payerName}</Text>
         ) : null}
         <TouchableOpacity
           className="mt-14 min-h-[64px] w-full items-center justify-center rounded-2xl bg-white px-8 py-4 active:scale-[0.98]"
@@ -448,7 +453,7 @@ export function CollectPaymentScreen({ navigation, route }: Props) {
     <View className="flex-1 bg-zinc-50">
       <ScreenHeader
         title={params.kind === 'ticket' ? 'Collect payment' : 'Collect membership'}
-        subtitle={params.memberName}
+        subtitle={payerName}
         onBack={() => navigation.goBack()}
       />
 

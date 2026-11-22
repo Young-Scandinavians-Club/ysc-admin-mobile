@@ -20,12 +20,9 @@ import type { RootStackParamList, TicketSelectionItem } from '@/components/navig
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenHeader } from '@/components/screens/ScreenHeader';
 import { useTapToPayCollector } from '@/lib/stripe-terminal';
+import { buyerName, canBuyTier, isPayableTier, isPublicTier } from '@/lib/ticketBuyer';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EventTicketQuantities'>;
-
-function isPayable(tier: EventTicketTier): boolean {
-  return tier.type === 'paid' || tier.type === 'donation';
-}
 
 function priceLabel(tier: EventTicketTier): string {
   if (tier.type === 'donation') return 'Any amount';
@@ -82,7 +79,7 @@ function totalLabelFor(items: TicketSelectionItem[]): string {
 }
 
 export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
-  const { eventId, eventTitle, memberId, memberName } = route.params;
+  const { eventId, eventTitle, buyer } = route.params;
   const insets = useSafeAreaInsets();
   const { data, error, isLoading } = useSWR('events', () => api.eventsList({ page_size: 50 }));
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -96,7 +93,11 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
   }, [prewarm]);
 
   const event = data?.data.find((item) => item.id === eventId);
-  const tiers = (event?.ticket_tiers ?? []).filter(isPayable);
+  // A guest or non-member can only be sold public tiers; the rest stay hidden
+  // rather than listed-but-disabled, as the volunteer can't act on them.
+  const tiers = (event?.ticket_tiers ?? []).filter(
+    (tier) => isPayableTier(tier) && canBuyTier(buyer, tier)
+  );
 
   function quantityFor(tierId: string): number {
     return quantities[tierId] ?? 0;
@@ -157,8 +158,7 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
     (startOffline: boolean) => {
       navigation.navigate('CollectPayment', {
         kind: 'ticket',
-        memberId,
-        memberName,
+        buyer,
         eventId,
         eventTitle,
         items: selectedItems,
@@ -166,14 +166,14 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
         ...(startOffline ? { startOffline: true } : {}),
       });
     },
-    [navigation, memberId, memberName, eventId, eventTitle, selectedItems]
+    [navigation, buyer, eventId, eventTitle, selectedItems]
   );
 
   return (
     <View className="flex-1 bg-zinc-50">
       <ScreenHeader
         title="Select tickets"
-        subtitle={eventTitle}
+        subtitle={`${eventTitle} · ${buyerName(buyer)}`}
         onBack={() => navigation.goBack()}
       />
 
@@ -221,7 +221,16 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
                   />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-base font-semibold text-zinc-900">{item.name}</Text>
+                  <View className="flex-row items-center">
+                    <Text className="shrink text-base font-semibold text-zinc-900">
+                      {item.name}
+                    </Text>
+                    {isPublicTier(item) && (
+                      <View className="ml-2 rounded-full bg-green-50 px-2 py-0.5">
+                        <Text className="text-xs font-medium text-green-700">Public</Text>
+                      </View>
+                    )}
+                  </View>
                   <Text className="mt-1 text-sm font-medium text-blue-700">{priceLabel(item)}</Text>
                   {exceedsAvailable ? (
                     <Text className="mt-0.5 text-xs font-medium text-amber-600">
@@ -276,7 +285,11 @@ export function EventTicketQuantitiesScreen({ navigation, route }: Props) {
           }}
           ListEmptyComponent={
             <View className="items-center py-12">
-              <Text className="text-sm text-zinc-500">No paid ticket tiers for this event</Text>
+              <Text className="text-sm text-zinc-500">
+                {buyer.kind === 'member' && buyer.hasActiveMembership
+                  ? 'No paid ticket tiers for this event'
+                  : 'No public ticket tiers for this event'}
+              </Text>
             </View>
           }
         />
